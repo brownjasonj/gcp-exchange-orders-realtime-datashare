@@ -1,0 +1,38 @@
+{
+  "name": "gcp-delay-data-visability",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "setup": "npm install && cd ../simulator-ui && npm install",
+    "build-ui": "cd ../simulator-ui && npx ng build",
+    "dev": "concurrently \"ts-node src/server.ts\" \"cd ../simulator-ui && npx ng serve\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codeenclave-io/gcp-delay-data-visability.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/codeenclave-io/gcp-delay-data-visability/issues"
+  },
+  "homepage": "https://github.com/codeenclave-io/gcp-delay-data-visability#readme",
+  "dependencies": {
+    "@google-cloud/pubsub": "^5.2.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "@types/socket.io": "^3.0.1",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "pino": "^10.1.0",
+    "socket.io": "^4.8.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

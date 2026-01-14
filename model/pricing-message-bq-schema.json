@@ -1,0 +1,50 @@
+[
+  {
+    "name": "symbol",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The trading symbol (e.g., BTC, ETH)"
+  },
+  {
+    "name": "sequenceNumber",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "Monotonically increasing sequence number for the message"
+  },
+  {
+    "name": "price",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "The current price value"
+  },
+  {
+    "name": "currency",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The currency of the price (e.g., USD, EUR)"
+  },
+  {
+    "name": "venue",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "The exchange or venue where the price originated"
+  },
+  {
+    "name": "timestamp",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "ISO 8601 timestamp of when the price was generated"
+  },
+  {
+    "name": "bidOffer",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Indicates if the price is a bid or an offer"
+  },
+  {
+    "name": "quantity",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "The quantity available at this price"
+  }
+]

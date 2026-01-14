@@ -1,0 +1,67 @@
+<div class="container">
+  <header>
+    <h1>Pricing Simulator</h1>
+    <div class="status-badge" [class.running]="isRunning" [class.stopped]="!isRunning">
+      {{ isRunning ? 'RUNNING' : 'STOPPED' }}
+    </div>
+  </header>
+
+  <main *ngIf="!fatalError">
+    <section class="control-panel">
+      <div class="actions">
+        <button (click)="toggleSimulation()" [class.btn-stop]="isRunning" [class.btn-start]="!isRunning">
+          {{ isRunning ? 'Stop Simulation' : 'Start Simulation' }}
+        </button>
+      </div>
+
+      <div class="config-editor">
+        <h3>Configuration</h3>
+        <textarea [(ngModel)]="configJsonString" rows="15"></textarea>
+        <div *ngIf="configError" class="error">{{ configError }}</div>
+        <button (click)="saveConfig()">Save Configuration</button>
+      </div>
+    </section>
+
+    <section class="data-panel">
+      <div class="prices-view">
+        <h3>Current Prices</h3>
+        <div class="prices-grid">
+          <div class="price-card" *ngFor="let p of prices">
+            <div class="pair">{{ p.key }}</div>
+            <div class="bid-offer-container">
+              <div class="price-box">
+                <div class="label">BID</div>
+                <div class="value bid" [class.flash]="isFlashing(p.key, 'bid')">{{ p.bid ? (p.bid | number:'1.2-2') : '-' }}</div>
+              </div>
+              <div class="price-box">
+                <div class="label">OFFER</div>
+                <div class="value offer" [class.flash]="isFlashing(p.key, 'offer')">{{ p.offer ? (p.offer | number:'1.2-2') : '-' }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="message-log">
+        <h3>Published Messages (Recent 50)</h3>
+        <div class="log-list">
+          <div class="log-item" *ngFor="let msg of messages">
+            <span class="time">{{ msg.timestamp }}</span>
+            <span class="symbol">{{ msg.symbol }}</span>
+            <span class="price">{{ msg.price | number:'1.2-2' }}</span>
+            <span class="venue">{{ msg.venue }}</span>
+            <span class="bidOffer" [class.bid]="msg.bidOffer === 'bid'" [class.offer]="msg.bidOffer === 'offer'">{{ msg.bidOffer |
+              uppercase }}</span>
+            <span class="quantity">{{ msg.quantity }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div *ngIf="fatalError" class="fatal-error">
+    <h2>Configuration Error</h2>
+    <p>{{ fatalError }}</p>
+  </div>
+</div>

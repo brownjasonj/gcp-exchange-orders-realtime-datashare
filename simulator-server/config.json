@@ -1,0 +1,23 @@
+{
+  "periodicityMs": 50,
+  "priceVariationPercentage": 2,
+  "gcpProjectId": "market-one-ip9muxsx",
+  "pubsubTopicName": "pricing-topic",
+  "symbols": [
+    "AAPL",
+    "GOOGL",
+    "MSFT",
+    "AMZN",
+    "TSLA"
+  ],
+  "currencies": [
+    "USD",
+    "EUR",
+    "GBP"
+  ],
+  "venues": [
+    "NASDAQ",
+    "NYSE",
+    "LSE"
+  ]
+}
