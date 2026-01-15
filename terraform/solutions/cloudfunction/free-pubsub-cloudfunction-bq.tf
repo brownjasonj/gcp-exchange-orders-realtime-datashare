@@ -21,7 +21,7 @@ resource "google_service_account" "pricing_function_sa" {
 # Grant permissions to the Function SA
 # 1. BigQuery Data Editor
 resource "google_bigquery_dataset_iam_member" "dataset_editor" {
-  dataset_id = var.dataset_id
+  dataset_id = var.trgt_dataset_id
   role       = "roles/bigquery.dataEditor"
   member     = "serviceAccount:${google_service_account.pricing_function_sa.email}"
 }
@@ -50,8 +50,8 @@ resource "google_cloudfunctions2_function" "process_pricing" {
 
     environment_variables = {
       PROJECT_ID       = var.project_id
-      DATASET_ID       = var.dataset_id
-      TABLE_ID         = var.table_id
+      DATASET_ID       = var.trgt_dataset_id
+      TABLE_ID         = google_bigquery_table.order_ticks_delay.table_id
       DELAY_IN_SECONDS = var.delay_in_seconds
     }
 

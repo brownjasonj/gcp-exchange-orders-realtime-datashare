@@ -13,14 +13,9 @@ variable "delay_in_seconds" {
   description = "The delay in seconds"
 }
 
-variable "dataset_id" {
+variable "trgt_dataset_id" {
   type        = string
   description = "The BigQuery dataset ID"
-}
-
-variable "table_id" {
-  type        = string
-  description = "The BigQuery table ID"
 }
 
 variable "topic_id" {
