@@ -1,0 +1,10 @@
+{
+  "name": "pubsub-to-bigtable",
+  "version": "1.0.0",
+  "description": "Cloud function to write Pub/Sub messages to Bigtable",
+  "main": "index.js",
+  "dependencies": {
+    "@google-cloud/bigtable": "^5.0.0",
+    "@google-cloud/functions-framework": "^3.0.0"
+  }
+}
