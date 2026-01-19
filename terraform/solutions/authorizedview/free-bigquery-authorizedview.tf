@@ -1,7 +1,8 @@
 resource "google_bigquery_table" "order_ticks_delay" {
-  dataset_id = var.trgt_dataset_id
-  table_id   = "order_ticks_delay_authview"
-  project    = var.project_id
+  dataset_id          = var.trgt_dataset_id
+  table_id            = "order_ticks_delay_authview"
+  project             = var.project_id
+  deletion_protection = false
 
   view {
     query          = <<EOF

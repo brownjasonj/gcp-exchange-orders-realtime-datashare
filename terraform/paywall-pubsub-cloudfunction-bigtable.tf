@@ -7,6 +7,10 @@ resource "google_project_iam_member" "bigtable_writer_user" {
   project = var.project_id
   role    = "roles/bigtable.user"
   member  = "serviceAccount:${google_service_account.bigtable_writer.email}"
+
+  depends_on = [
+    google_bigtable_table.bt_rt_order_ticks_all,
+  google_service_account.bigtable_writer]
 }
 
 data "archive_file" "function_source" {
@@ -44,7 +48,7 @@ resource "google_cloudfunctions2_function" "pricing_to_bigtable" {
     service_account_email = google_service_account.bigtable_writer.email
     environment_variables = {
       BIGTABLE_INSTANCE_ID = google_bigtable_instance.paywall_instance.name
-      BIGTABLE_TABLE_ID    = google_bigtable_table.order_ticks_all.name
+      BIGTABLE_TABLE_ID    = google_bigtable_table.bt_rt_order_ticks_all.name
     }
   }
 

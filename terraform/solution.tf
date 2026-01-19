@@ -14,6 +14,6 @@ module "free-bigquery-authorizedview" {
   region           = var.region
   delay_in_seconds = 200
   src_dataset_id   = google_bigquery_dataset.paywall_datasets.dataset_id
-  src_table_id     = google_bigquery_table.order_ticks_all.table_id
+  src_table_id     = google_bigquery_table.df_pricing_order_ticks_all.table_id
   trgt_dataset_id  = google_bigquery_dataset.free_datasets.dataset_id
 }
