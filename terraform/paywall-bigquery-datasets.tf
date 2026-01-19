@@ -22,3 +22,20 @@ resource "google_bigquery_table" "order_ticks_all" {
     field = "timestamp"
   }
 }
+
+resource "google_bigquery_analytics_hub_listing" "paywall_datasets_listing" {
+  project          = var.project_id
+  location         = var.region
+  data_exchange_id = google_bigquery_analytics_hub_data_exchange.datashare.data_exchange_id
+  listing_id       = "paywall_datasets_listing"
+  display_name     = "Paywall Datasets Listing"
+  description      = "Listing for Paywall Datasets"
+
+  bigquery_dataset {
+    dataset = google_bigquery_dataset.paywall_datasets.id
+  }
+
+  depends_on = [
+    google_bigquery_analytics_hub_data_exchange.datashare
+  ]
+}

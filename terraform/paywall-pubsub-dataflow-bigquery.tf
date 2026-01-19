@@ -39,3 +39,23 @@ resource "google_dataflow_flex_template_job" "pricing_to_bq_job" {
     data.google_compute_subnetwork.subnetwork
   ]
 }
+
+resource "google_bigquery_analytics_hub_listing" "pricing_subscription_listing" {
+  provider         = google-beta
+  project          = var.project_id
+  location         = var.region
+  data_exchange_id = google_bigquery_analytics_hub_data_exchange.datashare.data_exchange_id
+  listing_id       = "pricing_subscription_listing"
+  display_name     = "Pricing Subscription Listing"
+  description      = "Listing for Pricing Subscription"
+
+  pubsub_topic {
+    topic                 = google_pubsub_topic.pricing_topic.id
+    data_affinity_regions = [var.region]
+  }
+
+  depends_on = [
+    google_pubsub_topic.pricing_topic,
+    google_bigquery_analytics_hub_data_exchange.datashare
+  ]
+}
