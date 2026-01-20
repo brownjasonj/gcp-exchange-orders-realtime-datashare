@@ -19,6 +19,8 @@ export class AppComponent implements OnInit {
   configError: string | null = null;
   fatalError: string | null = null;
 
+
+
   constructor(private simService: SimulatorService) {
     const env = (window as any).ENV || {};
     const apiUrls = env.API_URLS || (env.API_URL ? [env.API_URL] : []);
@@ -34,6 +36,8 @@ export class AppComponent implements OnInit {
 
   ngOnInit() {
     if (this.fatalError) return;
+
+
 
     this.simService.status$.subscribe(s => {
       this.status = s;
@@ -66,6 +70,8 @@ export class AppComponent implements OnInit {
       this.configJsonString = JSON.stringify(c, null, 2);
     });
   }
+
+
 
   flashStates: Record<string, { bid: boolean, offer: boolean }> = {};
 

@@ -9,6 +9,8 @@
   <main *ngIf="!fatalError">
     <section class="control-panel">
       <div class="actions">
+
+
         <button (click)="toggleSimulation()" [class.btn-stop]="isRunning" [class.btn-start]="!isRunning">
           {{ isRunning ? 'Stop Simulation' : 'Start Simulation' }}
         </button>

@@ -33,8 +33,8 @@ export interface PricingMessage {
   providedIn: 'root'
 })
 export class SimulatorService {
-  private sockets: Socket[] = [];
-  private apiUrls: string[] = [];
+  private activeSockets: Map<number, Socket> = new Map();
+  public apiUrls: string[] = [];
 
   public status$ = new BehaviorSubject<any>(null);
   public prices$ = new BehaviorSubject<Record<string, { bid?: number, offer?: number }>>({});
@@ -53,13 +53,55 @@ export class SimulatorService {
     this.projectId = projectId;
     console.log(`Initializing SimulatorService with ${this.apiUrls.length} API_URLS, PROJECT_ID: ${this.projectId}`);
 
-    this.apiUrls.forEach((url, index) => {
-      const socket = io(url, {
-        transports: ['websocket', 'polling']
-      });
-      this.sockets.push(socket);
-      this.setupSocketListeners(socket, index);
+    // Connect to all shards by default
+    this.apiUrls.forEach((_, index) => {
+      this.connectShard(index);
     });
+  }
+
+  getShardCount(): number {
+    return this.apiUrls.length;
+  }
+
+  isShardConnected(index: number): boolean {
+    return this.activeSockets.has(index);
+  }
+
+  connectShard(index: number) {
+    if (this.activeSockets.has(index)) return;
+    if (index < 0 || index >= this.apiUrls.length) return;
+
+    const url = this.apiUrls[index];
+    console.log(`Connecting to Shard ${index} at ${url}`);
+
+    const socket = io(url, {
+      transports: ['websocket', 'polling']
+    });
+    this.activeSockets.set(index, socket);
+    this.setupSocketListeners(socket, index);
+  }
+
+  disconnectShard(index: number) {
+    const socket = this.activeSockets.get(index);
+    if (socket) {
+      console.log(`Disconnecting form Shard ${index}`);
+      socket.disconnect();
+      this.activeSockets.delete(index);
+
+      // Clear data associated with this shard? 
+      // For now, we keep the prices in the view until cleared or overwritten, 
+      // but maybe we should clear to avoid confusion.
+      // Ideally we'd remove keys belonging to this shard, but we don't track which key came from which shard easily.
+      // Let's just leave it, assuming user is switching views.
+    }
+  }
+
+  disconnectAll() {
+    this.activeSockets.forEach(s => s.disconnect());
+    this.activeSockets.clear();
+    this.prices$.next({});
+    this.messages$.next([]);
+    this.messageLog = [];
   }
 
   private setupSocketListeners(socket: Socket, index: number) {
@@ -78,9 +120,14 @@ export class SimulatorService {
       
       // Merge new keys. 
       // Assumption: Shards have distinct symbols, so collisions are rare or don't matter (last win).
-      Object.keys(prices).forEach(key => {
+      Object.entries(prices).forEach(([key, price]) => {
         if (!merged[key]) {
-             merged[key] = {}; // Initialize if new
+          merged[key] = { bid: price, offer: price }; // Initialize with base price
+        } else {
+          // Optional: Update existing if we want to sync baseline, but protecting existing bid/offer spread is probably better
+          // changing this to only fill gaps
+          if (merged[key].bid === undefined) merged[key].bid = price;
+          if (merged[key].offer === undefined) merged[key].offer = price;
         }
       });
       this.prices$.next(merged);
