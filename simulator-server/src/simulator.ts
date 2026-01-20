@@ -38,8 +38,16 @@ export class Simulator extends EventEmitter {
   }
 
   private initialize() {
-    // Cartesian product of symbols and currencies
-    for (const symbol of this.config.symbols) {
+    const shardIndex = parseInt(process.env.SHARD_INDEX || '0', 10);
+    const totalShards = parseInt(process.env.TOTAL_SHARDS || '1', 10);
+
+    logger.info({ msg: 'Initializing simulator shard', shardIndex, totalShards });
+
+    // Filter symbols based on shard index
+    const mySymbols = this.config.symbols.filter((_, index) => index % totalShards === shardIndex);
+
+    // Cartesian product of filtered symbols and currencies
+    for (const symbol of mySymbols) {
       for (const currency of this.config.currencies) {
         const pairKey = this.getPairKey(symbol, currency);
         // Initial random value between 10 and 1000
@@ -48,7 +56,7 @@ export class Simulator extends EventEmitter {
         this.pairs.push({ symbol, currency });
       }
     }
-    logger.info({ msg: 'Simulator initialized', pairsCount: this.pairs.length });
+    logger.info({ msg: 'Simulator initialized', pairsCount: this.pairs.length, symbolsCount: mySymbols.length });
   }
 
   private getPairKey(symbol: string, currency: string): string {

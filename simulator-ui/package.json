@@ -7,6 +7,7 @@
     "config": "node tools/set-env.js",
     "serve": "npm run config && ng serve",
     "start": "node server.js",
+    "gcp-build": "",
     "build": "ng build",
     "watch": "npm run config && ng build --watch --configuration development"
   },

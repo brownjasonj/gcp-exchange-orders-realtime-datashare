@@ -56,7 +56,8 @@ resource "null_resource" "build_and_push_image" {
 }
 
 resource "google_cloud_run_v2_service" "simulator_server" {
-  name     = "simulator-server"
+  count    = var.simulator_shards
+  name     = "simulator-server-${count.index}"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
@@ -75,6 +76,14 @@ resource "google_cloud_run_v2_service" "simulator_server" {
         name  = "CONFIG_PATH"
         value = "./config.json"
       }
+      env {
+        name = "SHARD_INDEX"
+        value = count.index
+      }
+      env {
+        name = "TOTAL_SHARDS"
+        value = var.simulator_shards
+      }
       ports {
         container_port = 8080
       }
@@ -89,15 +98,14 @@ resource "google_cloud_run_v2_service" "simulator_server" {
 }
 
 # Allow unauthenticated access to support public UI access and WebSockets
-# Resource commented out due to Organization Policy blocking allUsers
-# resource "google_cloud_run_service_iam_member" "simulator_server_public_access" {
-#   location = google_cloud_run_v2_service.simulator_server.location
-#   service  = google_cloud_run_v2_service.simulator_server.name
-#   role     = "roles/run.invoker"
-#   member   = "allUsers"
+resource "google_cloud_run_service_iam_member" "simulator_server_public_access" {
+  count    = var.simulator_shards
+  location = google_cloud_run_v2_service.simulator_server[count.index].location
+  service  = google_cloud_run_v2_service.simulator_server[count.index].name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 
-#   depends_on = [
-#     google_cloud_run_v2_service.simulator_server
-#   ]
-# }
-
+  depends_on = [
+    google_cloud_run_v2_service.simulator_server
+  ]
+}

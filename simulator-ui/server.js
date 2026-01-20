@@ -18,11 +18,13 @@ app.use((req, res, next) => {
 
 app.get('/env.js', (req, res) => {
     console.log('[DEBUG] Serving env.js');
-    const apiUrl = process.env.API_URL || '';
+    const apiUrlEnv = process.env.API_URLS || process.env.API_URL || '';
+    const apiUrls = apiUrlEnv.split(',').filter(url => !!url);
     const projectId = process.env.PROJECT_ID || '';
 
     res.type('application/javascript');
-    res.send(`window.ENV = { API_URL: "${apiUrl}", PROJECT_ID: "${projectId}" };`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.send(`window.ENV = { API_URLS: ${JSON.stringify(apiUrls)}, PROJECT_ID: "${projectId}" };`);
 });
 
 // Disable default index.html serving so we can handle SPA routing
@@ -33,14 +35,22 @@ if (fs.existsSync(DIST_PATH)) {
     console.error(`[DEBUG] DIST_PATH does not exist: ${DIST_PATH}`);
 }
 
-app.use(express.static(DIST_PATH, { index: false }));
+app.use(express.static(DIST_PATH, { index: false, maxAge: '1y' }));
 
 // fs required at top
 
 app.get('*', (req, res) => {
     console.log(`[DEBUG] Catch-all route hit for ${req.url}`);
+
+    // Don't serve index.html for missing static files
+    if (req.url.match(/\.(js|css|png|jpg|jpeg|gif|ico|json|map)$/)) {
+        console.error(`[DEBUG] Missing static file: ${req.url}`);
+        return res.status(404).send('File not found');
+    }
+
     const indexPath = path.join(DIST_PATH, 'index.html');
     if (fs.existsSync(indexPath)) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.sendFile(indexPath);
     } else {
         console.error(`[DEBUG] index.html not found at ${indexPath}`);

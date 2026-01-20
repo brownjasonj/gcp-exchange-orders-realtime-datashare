@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { io, Socket } from 'socket.io-client';
-import { Observable, BehaviorSubject } from 'rxjs';
+import { Observable, BehaviorSubject, forkJoin, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 declare var process: any;
 
@@ -32,8 +33,8 @@ export interface PricingMessage {
   providedIn: 'root'
 })
 export class SimulatorService {
-  private socket!: Socket;
-  private apiUrl = '';
+  private sockets: Socket[] = [];
+  private apiUrls: string[] = [];
 
   public status$ = new BehaviorSubject<any>(null);
   public prices$ = new BehaviorSubject<Record<string, { bid?: number, offer?: number }>>({});
@@ -47,50 +48,45 @@ export class SimulatorService {
   constructor(private http: HttpClient) {
   }
 
-  initialize(apiUrl: string, projectId: string) {
-    this.apiUrl = apiUrl;
+  initialize(apiUrls: string[], projectId: string) {
+    this.apiUrls = apiUrls;
     this.projectId = projectId;
-    console.log(`Initializing SimulatorService with API_URL: ${this.apiUrl}, PROJECT_ID: ${this.projectId}`);
+    console.log(`Initializing SimulatorService with ${this.apiUrls.length} API_URLS, PROJECT_ID: ${this.projectId}`);
 
-    this.socket = io(this.apiUrl, {
-      transports: ['websocket', 'polling']
+    this.apiUrls.forEach((url, index) => {
+      const socket = io(url, {
+        transports: ['websocket', 'polling']
+      });
+      this.sockets.push(socket);
+      this.setupSocketListeners(socket, index);
     });
-
-    this.setupSocketListeners();
   }
 
-  private setupSocketListeners() {
-    this.socket.on('connect', () => {
-      console.log('Connected to Simulator Backend');
+  private setupSocketListeners(socket: Socket, index: number) {
+    socket.on('connect', () => {
+      console.log(`Connected to Simulator Backend Shard ${index}`);
     });
 
-    this.socket.on('status', (status) => {
+    socket.on('status', (status) => {
+      // Just update status from any shard. They should be effectively sync'd by UI actions.
       this.status$.next(status);
     });
 
-    // TODO: 'prices' event from server still sends map of number, not bid/offer objects. 
-    // We might need to adjust or ignore it for now if we rely on updates. 
-    // Actually, on initial load, we might not have bid/offer distinction if server just sends "latest value". 
-    // Let's assume for now we start empty or with just a "last price" but we want split. 
-    // For MVP, if server sends simple map, we might just put it as both or neither?
-    // Let's update 'prices' event handler too if server sends it. 
-    // Server 'getPrices' returns Map<string, number>. This is "last trade price" effectively. 
-    // We can treat it as 'last' or maybe just ignore it if we want strict bid/offer. 
-    // But let's keep it simple: we won't show anything until first bid or offer update comes in, or we treat initial as "last".
-    // Actually, user asked for "latest bid and offer". 
-    this.socket.on('prices', (prices: Record<string, number>) => {
-      // Convert simple number to { bid?: number, offer?: number } ?
-      // No, we can't infer. Let's start with empty or preserve existing structure if we can.
-      // But we are changing the type of prices$. 
-      // Let's just initialize keys with empty objects.
-      const newPrices: Record<string, { bid?: number, offer?: number }> = {};
+    socket.on('prices', (prices: Record<string, number>) => {
+      const current = this.prices$.value;
+      const merged = { ...current };
+      
+      // Merge new keys. 
+      // Assumption: Shards have distinct symbols, so collisions are rare or don't matter (last win).
       Object.keys(prices).forEach(key => {
-        newPrices[key] = {}; // We don't know if the stored price was bid or offer.
+        if (!merged[key]) {
+             merged[key] = {}; // Initialize if new
+        }
       });
-      this.prices$.next(newPrices);
+      this.prices$.next(merged);
     });
 
-    this.socket.on('priceUpdate', (update: { symbol: string, currency: string, price: number, bidOffer: 'bid' | 'offer' }) => {
+    socket.on('priceUpdate', (update: { symbol: string, currency: string, price: number, bidOffer: 'bid' | 'offer' }) => {
       const current = this.prices$.value;
       const key = `${update.symbol}:${update.currency}`;
       const entry = current[key] || {};
@@ -106,7 +102,7 @@ export class SimulatorService {
       this.priceUpdate$.next({ key, field: update.bidOffer });
     });
 
-    this.socket.on('message', (msg: PricingMessage) => {
+    socket.on('message', (msg: PricingMessage) => {
       this.addMessage(msg);
     });
   }
@@ -120,19 +116,25 @@ export class SimulatorService {
   }
 
   // API Methods
+  
+  // Get config from the first shard (assuming consistent config)
   getConfig(): Observable<Config> {
-    return this.http.get<Config>(`${this.apiUrl}/api/config`);
+    if (this.apiUrls.length === 0) return of({} as Config);
+    return this.http.get<Config>(`${this.apiUrls[0]}/api/config`);
   }
 
-  updateConfig(config: Config): Observable<any> {
-    return this.http.post(`${this.apiUrl}/api/config`, config);
+  updateConfig(config: Config): Observable<any[]> {
+    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/config`, config));
+    return forkJoin(reqs);
   }
 
-  start(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/api/start`, {});
+  start(): Observable<any[]> {
+    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/start`, {}));
+    return forkJoin(reqs);
   }
 
-  stop(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/api/stop`, {});
+  stop(): Observable<any[]> {
+    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/stop`, {}));
+    return forkJoin(reqs);
   }
 }

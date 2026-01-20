@@ -21,14 +21,14 @@ export class AppComponent implements OnInit {
 
   constructor(private simService: SimulatorService) {
     const env = (window as any).ENV || {};
-    const apiUrl = env.API_URL;
+    const apiUrls = env.API_URLS || (env.API_URL ? [env.API_URL] : []);
     const projectId = env.PROJECT_ID;
 
-    if (!apiUrl || !projectId) {
-      this.fatalError = 'Missing Configuration: API_URL and PROJECT_ID must be defined in environment.';
+    if (apiUrls.length === 0 || !projectId) {
+      this.fatalError = 'Missing Configuration: API_URLS and PROJECT_ID must be defined in environment.';
       console.error(this.fatalError);
     } else {
-      this.simService.initialize(apiUrl, projectId);
+      this.simService.initialize(apiUrls, projectId);
     }
   }
 

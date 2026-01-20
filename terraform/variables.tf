@@ -26,3 +26,9 @@ variable "subnetwork_name" {
   type        = string
   default     = ""
 }
+
+variable "simulator_shards" {
+  description = "Number of simulator shards to deploy"
+  type        = number
+  default     = 10
+}
