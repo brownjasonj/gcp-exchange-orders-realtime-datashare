@@ -1,5 +1,5 @@
 resource "google_pubsub_schema" "pricing_schema" {
-  name       = "pricing-schema-v1"
+  name       = "pricing-schema-v2"
   type       = "AVRO"
   definition = file("${path.module}/../model/pricing-message.avsc")
 }

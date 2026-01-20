@@ -49,8 +49,9 @@ resource "google_pubsub_subscription" "pubsub_pricing_order_ticks_all_to_bq" {
   topic = google_pubsub_topic.pricing_topic.id
 
   bigquery_config {
-    table            = "${google_bigquery_table.pubsub_pricing_order_ticks_all.project}.${google_bigquery_table.pubsub_pricing_order_ticks_all.dataset_id}.${google_bigquery_table.pubsub_pricing_order_ticks_all.table_id}"
-    use_table_schema = true
+    table               = "${google_bigquery_table.pubsub_pricing_order_ticks_all.project}.${google_bigquery_table.pubsub_pricing_order_ticks_all.dataset_id}.${google_bigquery_table.pubsub_pricing_order_ticks_all.table_id}"
+    use_topic_schema    = true
+    drop_unknown_fields = true
   }
 
   depends_on = [

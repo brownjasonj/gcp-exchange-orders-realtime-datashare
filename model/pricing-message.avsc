@@ -36,11 +36,7 @@
     },
     {
       "name": "bidOffer",
-      "type": {
-        "type": "enum",
-        "name": "BidOffer",
-        "symbols": ["bid", "offer"]
-      },
+      "type": "string",
       "doc": "Indicates if the price is a bid or an offer"
     },
     {

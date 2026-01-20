@@ -46,5 +46,12 @@
     "type": "INTEGER",
     "mode": "REQUIRED",
     "description": "The quantity available at this price"
+  },
+  {
+    "name": "ingestion_time",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "The time when the message was ingested into BigQuery",
+    "defaultValueExpression": "CURRENT_TIMESTAMP()"
   }
 ]
