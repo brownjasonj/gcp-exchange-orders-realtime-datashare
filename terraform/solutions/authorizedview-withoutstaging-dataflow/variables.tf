@@ -8,6 +8,16 @@ variable "region" {
   type        = string
 }
 
+variable "network_id" {
+  description = "The GCP Network ID"
+  type        = string
+}
+
+variable "subnetwork_name" {
+  description = "The GCP Subnetwork Name"
+  type        = string
+}
+
 variable "delay_in_seconds" {
   description = "The delay in seconds for the authorized view"
   type        = number

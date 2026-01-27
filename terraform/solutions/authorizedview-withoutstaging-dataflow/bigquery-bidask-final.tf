@@ -6,7 +6,7 @@ resource "google_bigquery_table" "bidask_all_final" {
   dataset_id          = var.src_dataset_id
   table_id            = "bidask_all_final"
   project             = var.project_id
-  schema              = file("${path.module}/../model/pricing-message-bq-schema.json")
+  schema              = file("${var.src_bq_schema_file}")
   deletion_protection = false
 
   # Partitioning by day using the timestamp field
@@ -19,12 +19,7 @@ resource "google_bigquery_table" "bidask_all_final" {
   }
 
   depends_on = [
-    google_bigquery_dataset.paywall_datasets
   ]
-}
-
-data "google_project" "project" {
-  project_id = var.project_id
 }
 
 resource "google_bigquery_table_iam_member" "pubsub_bq_writer" {
