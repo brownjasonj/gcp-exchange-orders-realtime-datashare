@@ -46,6 +46,7 @@ resource "google_bigquery_data_transfer_config" "bidask_merge_scheduler" {
   data_source_id = "scheduled_query"
   schedule       = "every 15 minutes"
   project        = var.project_id
+  service_account_name = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 
   params = {
     query = <<EOF
