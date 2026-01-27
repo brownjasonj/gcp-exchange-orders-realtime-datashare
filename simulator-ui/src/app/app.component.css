@@ -131,7 +131,7 @@ main {
   margin-bottom: 10px;
 }
 
-.bid-offer-container {
+.bid-ask-container {
   display: flex;
   justify-content: space-around;
   gap: 10px;
@@ -159,11 +159,11 @@ main {
 }
 
 /* Red for Bid */
-.price-box .value.offer {
+.price-box .value.ask {
   color: #4caf50;
 }
 
-/* Green for Offer */
+/* Green for Ask */
 .price-box .value.flash {
   background-color: #ffe0b2;
   /* Light orange flash */
@@ -192,15 +192,15 @@ main {
 .log-item .symbol { color: #ff9800; font-weight: bold; }
 .log-item .price { color: #4caf50; }
 .log-item .venue { color: #2196f3; }
-.log-item .bidOffer {
+.log-item .bidAsk {
   font-weight: bold;
 }
 
-.log-item .bidOffer.bid {
+.log-item .bidAsk.bid {
   color: #00e676;
 }
 
-.log-item .bidOffer.offer {
+.log-item .bidAsk.ask {
   color: #ff5252;
 }
 

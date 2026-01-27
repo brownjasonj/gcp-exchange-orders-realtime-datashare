@@ -1,5 +1,5 @@
 resource "google_bigquery_table" "bt_rt_order_ticks_all" {
-  dataset_id          = google_bigquery_dataset.paywall_datasets.dataset_id
+  dataset_id          = var.trgt_dataset_id
   table_id            = "bt_rt_order_ticks_all"
   project             = var.project_id
   deletion_protection = false

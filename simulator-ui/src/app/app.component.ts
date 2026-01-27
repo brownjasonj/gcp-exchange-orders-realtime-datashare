@@ -12,7 +12,7 @@ import { SimulatorService, Config, PricingMessage } from './simulator.service';
 })
 export class AppComponent implements OnInit {
   status: any = null;
-  prices: { key: string; bid?: number; offer?: number }[] = [];
+  prices: { key: string; bid?: number; ask?: number }[] = [];
   messages: PricingMessage[] = [];
 
   configJsonString: string = '';
@@ -52,7 +52,7 @@ export class AppComponent implements OnInit {
 
     this.simService.prices$.subscribe(p => {
       // transform map to array for display
-      this.prices = Object.entries(p).map(([k, v]) => ({ key: k, bid: v.bid, offer: v.offer }));
+      this.prices = Object.entries(p).map(([k, v]) => ({ key: k, bid: v.bid, ask: v.ask }));
     });
 
     this.simService.priceUpdate$.subscribe(u => {
@@ -73,11 +73,11 @@ export class AppComponent implements OnInit {
 
 
 
-  flashStates: Record<string, { bid: boolean, offer: boolean }> = {};
+  flashStates: Record<string, { bid: boolean, ask: boolean }> = {};
 
-  triggerFlash(key: string, field: 'bid' | 'offer') {
+  triggerFlash(key: string, field: 'bid' | 'ask') {
     if (!this.flashStates[key]) {
-      this.flashStates[key] = { bid: false, offer: false };
+      this.flashStates[key] = { bid: false, ask: false };
     }
     this.flashStates[key][field] = true;
     setTimeout(() => {
@@ -85,7 +85,7 @@ export class AppComponent implements OnInit {
     }, 200); // 200ms flash
   }
 
-  isFlashing(key: string, field: 'bid' | 'offer'): boolean {
+  isFlashing(key: string, field: 'bid' | 'ask'): boolean {
     return this.flashStates[key]?.[field] || false;
   }
 

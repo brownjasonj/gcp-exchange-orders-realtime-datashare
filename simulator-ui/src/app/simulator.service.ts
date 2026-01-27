@@ -25,7 +25,7 @@ export interface PricingMessage {
   venue: string;
 
   timestamp: string;
-  bidOffer: 'bid' | 'offer';
+  bidAsk: 'bid' | 'ask';
   quantity: number;
 }
 
@@ -37,8 +37,8 @@ export class SimulatorService {
   public apiUrls: string[] = [];
 
   public status$ = new BehaviorSubject<any>(null);
-  public prices$ = new BehaviorSubject<Record<string, { bid?: number, offer?: number }>>({});
-  public priceUpdate$ = new BehaviorSubject<{ key: string, field: 'bid' | 'offer' } | null>(null);
+  public prices$ = new BehaviorSubject<Record<string, { bid?: number, ask?: number }>>({});
+  public priceUpdate$ = new BehaviorSubject<{ key: string, field: 'bid' | 'ask' } | null>(null);
   public messages$ = new BehaviorSubject<PricingMessage[]>([]);
 
   private messageLog: PricingMessage[] = [];
@@ -122,31 +122,31 @@ export class SimulatorService {
       // Assumption: Shards have distinct symbols, so collisions are rare or don't matter (last win).
       Object.entries(prices).forEach(([key, price]) => {
         if (!merged[key]) {
-          merged[key] = { bid: price, offer: price }; // Initialize with base price
+          merged[key] = { bid: price, ask: price }; // Initialize with base price
         } else {
-          // Optional: Update existing if we want to sync baseline, but protecting existing bid/offer spread is probably better
+          // Optional: Update existing if we want to sync baseline, but protecting existing bid/ask spread is probably better
           // changing this to only fill gaps
           if (merged[key].bid === undefined) merged[key].bid = price;
-          if (merged[key].offer === undefined) merged[key].offer = price;
+          if (merged[key].ask === undefined) merged[key].ask = price;
         }
       });
       this.prices$.next(merged);
     });
 
-    socket.on('priceUpdate', (update: { symbol: string, currency: string, price: number, bidOffer: 'bid' | 'offer' }) => {
+    socket.on('priceUpdate', (update: { symbol: string, currency: string, price: number, bidAsk: 'bid' | 'ask' }) => {
       const current = this.prices$.value;
       const key = `${update.symbol}:${update.currency}`;
       const entry = current[key] || {};
 
       const newEntry = { ...entry };
-      if (update.bidOffer === 'bid') {
+      if (update.bidAsk === 'bid') {
         newEntry.bid = update.price;
       } else {
-        newEntry.offer = update.price;
+        newEntry.ask = update.price;
       }
 
       this.prices$.next({ ...current, [key]: newEntry });
-      this.priceUpdate$.next({ key, field: update.bidOffer });
+      this.priceUpdate$.next({ key, field: update.bidAsk });
     });
 
     socket.on('message', (msg: PricingMessage) => {

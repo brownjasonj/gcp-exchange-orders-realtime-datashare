@@ -3,14 +3,14 @@
 This repository demonstrates how to use GCP native services to provide real-time data and delays to that data as a steam, history data sets and shares data sets to data consumers without copying those data.  The problem is inspired by the need to provide real-time data to different exchange customers with a  variety of periodicities for different purposes.
 
 <h4>Background</h4>
-Securities exchanges generate a significant amount of real-time order data throughout the day  reflecting the continuous bid/offer price changes as a result of trading activities.  This data is consumed by different exchange customers with a  variety of periodicities for different purposes:
+Securities exchanges generate a significant amount of real-time order data throughout the day  reflecting the continuous bid/ask price changes as a result of trading activities.  This data is consumed by different exchange customers with a  variety of periodicities for different purposes:
 
 <h5>Real-Time (Ultra-Low latency)</h5>
 Participants of an exchange have machines co-located in the exchanges data centres connected by short cables to limit pricing data latency and order submitting.  Pricing data is consumed directly via this dedicated link and primarily used by high velocity arbitrage trading algorithms.
 <h5>Near-Time</h5>
 Participants that are not located in the exchanges data centre, due to inhibitive cost for doing so, will receive the same pricing data but with a slight delay due with respect to the co-located participants.  Consumed data is used for algorithmic trading and providing updated pricing information for trader terminals and applications.
 <h5>Daily Opening/Closing</h5>
-The opening (or closing) bid/offer prices of a securities are used primarily for trading financial reporting and control purposes.
+The opening (or closing) bid/ask prices of a securities are used primarily for trading financial reporting and control purposes.
 <h5>Historic pricing data</h5>
 Historic data consists of all past ticking data from the exchange and made available as free or to paying customers.  Generally data that is older than 15 minutes is made available for free for anyone to consume.
 

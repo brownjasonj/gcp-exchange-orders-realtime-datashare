@@ -15,6 +15,6 @@ export interface PricingMessage {
   currency: string;
   venue: string;
   timestamp: string; // ISO 8601
-  bidOffer: 'bid' | 'offer';
+  bidAsk: 'bid' | 'ask';
   quantity: number;
 }

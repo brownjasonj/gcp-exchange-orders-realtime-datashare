@@ -28,7 +28,7 @@ functions.cloudEvent('processPricing', async (cloudEvent) => {
           venue: json.venue,
           timestamp: json.timestamp,
           quantity: String(json.quantity),
-          bidOffer: json.bidOffer,
+          bidAsk: json.bidAsk,
           sequenceNumber: String(json.sequenceNumber)
         }
       }

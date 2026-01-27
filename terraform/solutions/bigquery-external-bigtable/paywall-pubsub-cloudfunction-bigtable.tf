@@ -9,7 +9,6 @@ resource "google_project_iam_member" "bigtable_writer_user" {
   member  = "serviceAccount:${google_service_account.bigtable_writer.email}"
 
   depends_on = [
-    google_bigtable_table.bt_rt_order_ticks_all,
   google_service_account.bigtable_writer]
 }
 

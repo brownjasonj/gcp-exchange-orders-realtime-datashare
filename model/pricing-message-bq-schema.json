@@ -36,10 +36,10 @@
     "description": "ISO 8601 timestamp of when the price was generated"
   },
   {
-    "name": "bidOffer",
+    "name": "bidAsk",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "Indicates if the price is a bid or an offer"
+    "description": "Indicates if the price is a bid or an ask"
   },
   {
     "name": "quantity",

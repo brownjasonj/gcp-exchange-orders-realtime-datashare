@@ -143,7 +143,7 @@ export class Simulator extends EventEmitter {
       currency: pair.currency,
       venue: venue,
       timestamp: new Date().toISOString(),
-      bidOffer: Math.random() > 0.5 ? 'bid' : 'offer',
+      bidAsk: Math.random() > 0.5 ? 'bid' : 'ask',
       quantity: Math.floor(Math.random() * 1000) + 1
     };
 

@@ -30,14 +30,14 @@
         <div class="prices-grid">
           <div class="price-card" *ngFor="let p of prices">
             <div class="pair">{{ p.key }}</div>
-            <div class="bid-offer-container">
+            <div class="bid-ask-container">
               <div class="price-box">
                 <div class="label">BID</div>
                 <div class="value bid" [class.flash]="isFlashing(p.key, 'bid')">{{ p.bid ? (p.bid | number:'1.2-2') : '-' }}</div>
               </div>
               <div class="price-box">
-                <div class="label">OFFER</div>
-                <div class="value offer" [class.flash]="isFlashing(p.key, 'offer')">{{ p.offer ? (p.offer | number:'1.2-2') : '-' }}
+                <div class="label">ASK</div>
+                <div class="value ask" [class.flash]="isFlashing(p.key, 'ask')">{{ p.ask ? (p.ask | number:'1.2-2') : '-' }}
                 </div>
               </div>
             </div>
@@ -53,7 +53,7 @@
             <span class="symbol">{{ msg.symbol }}</span>
             <span class="price">{{ msg.price | number:'1.2-2' }}</span>
             <span class="venue">{{ msg.venue }}</span>
-            <span class="bidOffer" [class.bid]="msg.bidOffer === 'bid'" [class.offer]="msg.bidOffer === 'offer'">{{ msg.bidOffer |
+            <span class="bidAsk" [class.bid]="msg.bidAsk === 'bid'" [class.ask]="msg.bidAsk === 'ask'">{{ msg.bidAsk |
               uppercase }}</span>
             <span class="quantity">{{ msg.quantity }}</span>
           </div>

@@ -75,7 +75,7 @@ io.on('connection', (socket) => {
 // Simulator Events
 simulator.on('message', (message) => {
   io.emit('message', message);
-  io.emit('priceUpdate', { symbol: message.symbol, currency: message.currency, price: message.price, bidOffer: message.bidOffer });
+  io.emit('priceUpdate', { symbol: message.symbol, currency: message.currency, price: message.price, bidAsk: message.bidAsk });
 });
 
 // API Routes
