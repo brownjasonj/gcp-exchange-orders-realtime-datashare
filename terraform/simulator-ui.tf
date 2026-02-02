@@ -50,12 +50,13 @@ resource "google_cloudfunctions2_function" "simulator_ui" {
     timeout_seconds    = 60
     environment_variables = {
       PROJECT_ID = var.project_id
-      API_URLS   = join(",", google_cloud_run_v2_service.simulator_server[*].uri)
+      API_URLS   = join(",", concat(google_cloud_run_v2_service.simulator_server[*].uri, google_cloud_run_v2_service.simulator_server_rust[*].uri))
     }
   }
 
   depends_on = [
     google_cloud_run_v2_service.simulator_server,
+    google_cloud_run_v2_service.simulator_server_rust,
     google_storage_bucket_object.simulator_ui_object
   ]
 }

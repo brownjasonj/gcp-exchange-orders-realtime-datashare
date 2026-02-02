@@ -37,6 +37,7 @@ locals {
 }
 
 resource "null_resource" "build_and_push_image" {
+  count    = var.simulator_implementation == "node" ? 1 : 0
   triggers = {
     image_hash = local.composite_hash
   }
@@ -56,7 +57,7 @@ resource "null_resource" "build_and_push_image" {
 }
 
 resource "google_cloud_run_v2_service" "simulator_server" {
-  count    = var.simulator_shards
+  count    = var.simulator_implementation == "node" ? var.simulator_shards : 0
   name     = "simulator-server-${count.index}"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
@@ -99,7 +100,7 @@ resource "google_cloud_run_v2_service" "simulator_server" {
 
 # Allow unauthenticated access to support public UI access and WebSockets
 resource "google_cloud_run_service_iam_member" "simulator_server_public_access" {
-  count    = var.simulator_shards
+  count    = var.simulator_implementation == "node" ? var.simulator_shards : 0
   location = google_cloud_run_v2_service.simulator_server[count.index].location
   service  = google_cloud_run_v2_service.simulator_server[count.index].name
   role     = "roles/run.invoker"
