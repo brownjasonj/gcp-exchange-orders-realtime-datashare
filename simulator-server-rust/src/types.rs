@@ -10,6 +10,12 @@ pub struct Config {
     pub symbols: Vec<String>,
     pub currencies: Vec<String>,
     pub venues: Vec<String>,
+    #[serde(default = "default_burst_size")]
+    pub burst_size: u64,
+}
+
+fn default_burst_size() -> u64 {
+    1_000_000
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,4 +45,11 @@ pub struct PriceUpdate {
     pub currency: String,
     pub price: f64,
     pub bid_ask: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BurstProgress {
+    pub percent_complete: u8,
+    pub message_count: u64,
 }

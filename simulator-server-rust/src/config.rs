@@ -25,6 +25,7 @@ pub fn load_config(path: &str) -> Config {
         symbols: vec!["BTC".to_string(), "ETH".to_string()],
         currencies: vec!["USD".to_string()],
         venues: vec!["GCP".to_string()],
+        burst_size: 1_000_000,
     }
 }
 

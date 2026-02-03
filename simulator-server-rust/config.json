@@ -1,5 +1,6 @@
 {
   "periodicityMs": 50,
+  "burstSize": 1000000,
   "priceVariationPercentage": 2,
   "gcpProjectId": "market-one-ip9muxsx",
   "pubsubTopicName": "pricing-topic",

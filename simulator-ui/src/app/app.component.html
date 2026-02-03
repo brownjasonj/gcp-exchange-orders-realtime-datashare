@@ -62,6 +62,28 @@
     </section>
   </main>
 
+  <div class="burst-log" *ngIf="burstProgress.length > 0 && (isBursting || !minimizedBurstLog)"
+    [class.minimized]="minimizedBurstLog">
+    <div class="header" (click)="toggleBurstLog()">
+      <span>Burst Generation Progress ({{ averageBurstPercent }}%)</span>
+      <button>{{ minimizedBurstLog ? '+' : '-' }}</button>
+    </div>
+    <div class="content" *ngIf="!minimizedBurstLog">
+      <div class="shard-progress" *ngFor="let p of burstProgress">
+        <div class="shard-label">Shard {{ p.shardIndex }} - {{ p.messageCount | number }} msgs</div>
+        <div class="progress-bar">
+          <div class="fill" [style.width.%]="p.percentComplete"></div>
+        </div>
+        <div class="details">
+          <span>{{ p.percentComplete }}%</span>
+        </div>
+      </div>
+      <div class="total-summary" *ngIf="burstProgress.length > 1">
+        <strong>Total: {{ totalBurstMessageCount | number }} messages</strong>
+      </div>
+    </div>
+  </div>
+
   <div *ngIf="fatalError" class="fatal-error">
     <h2>Configuration Error</h2>
     <p>{{ fatalError }}</p>

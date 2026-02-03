@@ -128,6 +128,7 @@ impl Simulator {
         }
         state_guard.running = true;
         let periodicity = state_guard.config.periodicity_ms;
+        let burst_size = state_guard.config.burst_size;
         drop(state_guard);
 
         let sim_clone = self.clone();
@@ -140,6 +141,48 @@ impl Simulator {
         info!("Starting simulation loop with periodicity {}ms", periodicity);
 
         *handle_guard = Some(tokio::spawn(async move {
+            if burst_size > 0 {
+                info!("Generating burst of {} messages...", burst_size);
+                let mut burst_msgs = Vec::with_capacity(burst_size as usize);
+                let mut last_reported_percent = 0;
+                
+                // Emit 0% start
+                let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { percent_complete: 0, message_count: 0 }).await;
+
+                for i in 0..burst_size {
+                    if let Some(msg) = sim_clone.generate_message().await {
+                         burst_msgs.push(msg);
+                    }
+                    
+                    let percent = ((i + 1) as f64 / burst_size as f64 * 100.0) as u8;
+                    if percent >= last_reported_percent + 5 {
+                        last_reported_percent = percent;
+                        let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
+                            percent_complete: percent, 
+                            message_count: (i + 1) 
+                        }).await;
+                    }
+                    
+                    if (i + 1) % 10000 == 0 {
+                        info!("Generated {} burst messages", i + 1);
+                    }
+                }
+                
+                // Emit 100% complete
+                let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
+                    percent_complete: 100, 
+                    message_count: burst_msgs.len() as u64 
+                }).await;
+                
+                info!("Burst generation complete. Total: {}", burst_msgs.len());
+                
+                info!("Publishing burst of {} messages...", burst_msgs.len());
+                for msg in burst_msgs {
+                    sim_clone.publish_message(&msg).await;
+                }
+                info!("Burst complete.");
+            }
+
             let mut ticker = interval(Duration::from_millis(periodicity));
             loop {
                 ticker.tick().await;
@@ -206,72 +249,52 @@ impl Simulator {
         }
     }
 
-    async fn tick(&self) {
-         let (msg, _topic_name) = {
-            let mut state = self.state.write().await;
-            let mut rng = rand::rng();
+    async fn generate_message(&self) -> Option<PricingMessage> {
+        let mut state = self.state.write().await;
+        let mut rng = rand::rng();
 
-            if state.pairs.is_empty() {
-                return;
-            }
-            
-            let pair_idx = rng.random_range(0..state.pairs.len());
-            let (symbol, currency) = state.pairs[pair_idx].clone();
-            let key = format!("{}:{}", symbol, currency);
-            
-            let current_price = *state.prices.get(&key).unwrap_or(&100.0);
-            
-            let variation = state.config.price_variation_percentage;
-            let change = (rng.random::<f64>() * 2.0 - 1.0) * variation;
-            let factor = 1.0 + change / 100.0;
-            let mut new_price = current_price * factor;
-            if new_price < 0.01 { new_price = 0.01; }
-            new_price = (new_price * 100.0).round() / 100.0;
-            
-            state.prices.insert(key.clone(), new_price);
-            
-            let venue_idx = rng.random_range(0..state.config.venues.len());
-            let venue = state.config.venues[venue_idx].clone();
-            
-            let msg = PricingMessage {
-                symbol: symbol.clone(),
-                sequence_number: state.sequence_number,
-                price: new_price,
-                currency: currency.clone(),
-                venue,
-                timestamp: Utc::now().to_rfc3339(),
-                bid_ask: if rng.random_bool(0.5) { "bid".to_string() } else { "ask".to_string() },
-                quantity: rng.random_range(1..1001),
-            };
-            
-            state.sequence_number += 1;
-            
-            (msg, state.config.pubsub_topic_name.clone())
+        if state.pairs.is_empty() {
+            return None;
+        }
+        
+        let pair_idx = rng.random_range(0..state.pairs.len());
+        let (symbol, currency) = state.pairs[pair_idx].clone();
+        let key = format!("{}:{}", symbol, currency);
+        
+        let current_price = *state.prices.get(&key).unwrap_or(&100.0);
+        
+        let variation = state.config.price_variation_percentage;
+        let change = (rng.random::<f64>() * 2.0 - 1.0) * variation;
+        let factor = 1.0 + change / 100.0;
+        let mut new_price = current_price * factor;
+        if new_price < 0.01 { new_price = 0.01; }
+        new_price = (new_price * 100.0).round() / 100.0;
+        
+        state.prices.insert(key.clone(), new_price);
+        
+        let venue_idx = rng.random_range(0..state.config.venues.len());
+        let venue = state.config.venues[venue_idx].clone();
+        
+        let msg = PricingMessage {
+            symbol: symbol.clone(),
+            sequence_number: state.sequence_number,
+            price: new_price,
+            currency: currency.clone(),
+            venue,
+            timestamp: Utc::now().to_rfc3339(),
+            bid_ask: if rng.random_bool(0.5) { "bid".to_string() } else { "ask".to_string() },
+            quantity: rng.random_range(1..1001),
         };
+        
+        state.sequence_number += 1;
+        Some(msg)
+    }
 
-        let _ = self.io.emit("message", &msg).await;
-        
-        let update = PriceUpdate {
-            symbol: msg.symbol.clone(),
-            currency: msg.currency.clone(),
-            price: msg.price,
-            bid_ask: msg.bid_ask.clone(),
-        };
-        let _ = self.io.emit("priceUpdate", &update).await;
-        
-        // Publish to PubSub using cached publisher
+    async fn publish_message(&self, msg: &PricingMessage) {
         let publisher_guard = self.publisher.read().await;
         if let Some(publisher) = &*publisher_guard {
-            match serde_json::to_vec(&msg) {
+            match serde_json::to_vec(msg) {
                  Ok(data) => {
-                     // Fire and forget - await the enqueue, not the result
-                     // wait, publisher.publish() returns an Awaiter. 
-                     // If we await it, we wait for the message to be sent.
-                     // For high throughput, we might spawn it?
-                     // Or just await it? It should be fast if batching is used (it returns when enqueued? no, usually when acked).
-                     // Google Cloud PubSub crate `publish` waits for ack.
-                     // Using `publish` in a loop will throttle us to latency of Pub/Sub.
-                     // We should spawn a task to await it if we want fire-and-forget.
                      let publisher = publisher.clone();
                      tokio::spawn(async move {
                          let _ = publisher.publish(PubsubMessage {
@@ -282,6 +305,22 @@ impl Simulator {
                  },
                  Err(e) => error!("Failed to serialize message: {}", e),
              }
+        }
+    }
+
+    async fn tick(&self) {
+        if let Some(msg) = self.generate_message().await {
+            let _ = self.io.emit("message", &msg).await;
+            
+            let update = PriceUpdate {
+                symbol: msg.symbol.clone(),
+                currency: msg.currency.clone(),
+                price: msg.price,
+                bid_ask: msg.bid_ask.clone(),
+            };
+            let _ = self.io.emit("priceUpdate", &update).await;
+            
+            self.publish_message(&msg).await;
         }
     }
 }

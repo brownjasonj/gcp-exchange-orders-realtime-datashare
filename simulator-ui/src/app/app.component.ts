@@ -14,6 +14,8 @@ export class AppComponent implements OnInit {
   status: any = null;
   prices: { key: string; bid?: number; ask?: number }[] = [];
   messages: PricingMessage[] = [];
+  burstProgress: { shardIndex: number, percentComplete: number, messageCount: number }[] = [];
+  minimizedBurstLog = false;
 
   configJsonString: string = '';
   configError: string | null = null;
@@ -65,6 +67,13 @@ export class AppComponent implements OnInit {
       this.messages = m;
     });
 
+    this.simService.burstProgress$.subscribe(p => {
+      this.burstProgress = Array.from(p.entries()).map(([index, progress]) => ({
+        shardIndex: index,
+        ...progress
+      })).sort((a, b) => a.shardIndex - b.shardIndex);
+    });
+
     // Also fetch config explicitly
     this.simService.getConfig().subscribe(c => {
       this.configJsonString = JSON.stringify(c, null, 2);
@@ -93,6 +102,19 @@ export class AppComponent implements OnInit {
     return this.status?.isRunning || false;
   }
 
+  get isBursting(): boolean {
+    return this.burstProgress.some(p => p.percentComplete < 100);
+  }
+
+  get totalBurstMessageCount(): number {
+    return this.burstProgress.reduce((sum, p) => sum + p.messageCount, 0);
+  }
+
+  get averageBurstPercent(): number {
+    if (this.burstProgress.length === 0) return 0;
+    return Math.round(this.burstProgress.reduce((sum, p) => sum + p.percentComplete, 0) / this.burstProgress.length);
+  }
+
   toggleSimulation() {
     if (this.isRunning) {
       this.simService.stop().subscribe();
@@ -112,5 +134,9 @@ export class AppComponent implements OnInit {
     } catch (e) {
       this.configError = (e as Error).message;
     }
+  }
+
+  toggleBurstLog() {
+    this.minimizedBurstLog = !this.minimizedBurstLog;
   }
 }

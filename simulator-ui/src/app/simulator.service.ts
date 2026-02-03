@@ -40,6 +40,7 @@ export class SimulatorService {
   public prices$ = new BehaviorSubject<Record<string, { bid?: number, ask?: number }>>({});
   public priceUpdate$ = new BehaviorSubject<{ key: string, field: 'bid' | 'ask' } | null>(null);
   public messages$ = new BehaviorSubject<PricingMessage[]>([]);
+  public burstProgress$ = new BehaviorSubject<Map<number, { percentComplete: number, messageCount: number }>>(new Map());
 
   private messageLog: PricingMessage[] = [];
   private readonly MAX_LOG_SIZE = 50;
@@ -52,6 +53,9 @@ export class SimulatorService {
     this.apiUrls = apiUrls;
     this.projectId = projectId;
     console.log(`Initializing SimulatorService with ${this.apiUrls.length} API_URLS, PROJECT_ID: ${this.projectId}`);
+
+    // Reset progress map
+    this.burstProgress$.next(new Map());
 
     // Connect to all shards by default
     this.apiUrls.forEach((_, index) => {
@@ -152,6 +156,12 @@ export class SimulatorService {
     socket.on('message', (msg: PricingMessage) => {
       this.addMessage(msg);
     });
+
+    socket.on('burstProgress', (progress: { percentComplete: number, messageCount: number }) => {
+      const current = this.burstProgress$.value;
+      current.set(index, progress);
+      this.burstProgress$.next(new Map(current));
+    });
   }
 
   private addMessage(msg: PricingMessage) {
@@ -171,11 +181,13 @@ export class SimulatorService {
   }
 
   updateConfig(config: Config): Observable<any[]> {
+    this.burstProgress$.next(new Map());
     const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/config`, config));
     return forkJoin(reqs);
   }
 
   start(): Observable<any[]> {
+    this.burstProgress$.next(new Map());
     const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/start`, {}));
     return forkJoin(reqs);
   }
