@@ -12,8 +12,6 @@ pub struct Config {
     pub venues: Vec<String>,
     #[serde(default = "default_burst_size")]
     pub burst_size: u64,
-    #[serde(default = "default_burst_publish_batch_size")]
-    pub burst_publish_batch_size: usize,
     #[serde(default = "default_pubsub_batch_messages")]
     pub pubsub_batch_messages: usize,
     #[serde(default = "default_pubsub_batch_delay_ms")]
@@ -30,10 +28,6 @@ fn default_pubsub_batch_delay_ms() -> u64 {
 
 fn default_burst_size() -> u64 {
     1_000_000
-}
-
-fn default_burst_publish_batch_size() -> usize {
-    1000
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

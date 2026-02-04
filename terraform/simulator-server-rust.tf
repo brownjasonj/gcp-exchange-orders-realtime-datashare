@@ -74,8 +74,8 @@ resource "google_cloud_run_v2_service" "simulator_server_rust" {
       }
       resources {
         limits = {
-          cpu    = "1000m"
-          memory = "2048Mi"
+          cpu    = "2000m"
+          memory = "8192Mi"
         }
       }
       startup_probe {

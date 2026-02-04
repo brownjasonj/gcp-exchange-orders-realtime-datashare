@@ -90,9 +90,9 @@ impl Simulator {
                  let _ = old_pub.shutdown().await;
              }
              
-             // Create new publisher with batch settings from config
+             // Create new publisher with batch settings from config (clamped to GCP limit of 1000)
              let publisher_config = PublisherConfig {
-                 bundle_size: state.config.pubsub_batch_messages,
+                 bundle_size: state.config.pubsub_batch_messages.min(1000),
                  flush_interval: Duration::from_millis(state.config.pubsub_batch_delay_ms),
                  ..Default::default()
              };
@@ -135,7 +135,7 @@ impl Simulator {
         state_guard.running = true;
         let periodicity = state_guard.config.periodicity_ms;
         let burst_size = state_guard.config.burst_size;
-        let batch_size = state_guard.config.burst_publish_batch_size;
+        let batch_size = state_guard.config.pubsub_batch_messages;
         drop(state_guard);
 
         let sim_clone = self.clone();
