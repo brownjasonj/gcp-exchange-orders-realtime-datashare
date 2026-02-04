@@ -24,7 +24,7 @@ struct State {
 #[derive(Clone)]
 pub struct Simulator {
     state: Arc<RwLock<State>>,
-    io: SocketIo,
+    pub io: SocketIo,
     pubsub: Option<Client>,
     publisher: Arc<RwLock<Option<Publisher>>>,
     task_handle: Arc<Mutex<Option<JoinHandle<()>>>>,

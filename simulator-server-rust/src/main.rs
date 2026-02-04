@@ -104,6 +104,8 @@ async fn update_config(State(sim): State<Simulator>, Json(config): Json<Config>)
     }
     
     sim.update_config(config.clone()).await;
+    let status = sim.get_status().await;
+    let _ = sim.io.emit("status", &status).await;
     
     Json(ConfigResponse {
         success: true,
@@ -118,11 +120,15 @@ struct SuccessResponse {
 
 async fn start_sim(State(sim): State<Simulator>) -> Json<SuccessResponse> {
     sim.start().await;
+    let status = sim.get_status().await;
+    let _ = sim.io.emit("status", &status).await;
     Json(SuccessResponse { success: true })
 }
 
 async fn stop_sim(State(sim): State<Simulator>) -> Json<SuccessResponse> {
     sim.stop().await;
+    let status = sim.get_status().await;
+    let _ = sim.io.emit("status", &status).await;
     Json(SuccessResponse { success: true })
 }
 
