@@ -34,7 +34,7 @@ resource "google_cloudfunctions2_function" "simulator_ui" {
   description = "Simulator UI Function"
 
   build_config {
-    runtime     = "nodejs20"
+    runtime     = "nodejs24"
     entry_point = "app"
     source {
       storage_source {

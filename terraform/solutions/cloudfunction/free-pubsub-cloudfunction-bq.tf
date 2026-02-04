@@ -33,7 +33,7 @@ resource "google_cloudfunctions2_function" "process_pricing" {
   description = "Processes pricing messages with delay"
 
   build_config {
-    runtime     = "nodejs20"
+    runtime     = "nodejs24"
     entry_point = "processPricingMessage"
     source {
       storage_source {

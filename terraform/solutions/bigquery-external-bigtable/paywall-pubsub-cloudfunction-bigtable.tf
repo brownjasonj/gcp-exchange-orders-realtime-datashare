@@ -30,7 +30,7 @@ resource "google_cloudfunctions2_function" "pricing_to_bigtable" {
   description = "Writes pricing Pub/Sub messages to Bigtable"
 
   build_config {
-    runtime     = "nodejs20"
+    runtime     = "nodejs24"
     entry_point = "processPricing"
     source {
       storage_source {
