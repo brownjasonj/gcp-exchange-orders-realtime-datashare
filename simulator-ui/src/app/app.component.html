@@ -70,7 +70,8 @@
     </div>
     <div class="content" *ngIf="!minimizedBurstLog">
       <div class="shard-progress" *ngFor="let p of burstProgress">
-        <div class="shard-label">Shard {{ p.shardIndex }} - {{ p.messageCount | number }} msgs</div>
+        <div class="shard-label">Shard {{ p.shardIndex }} - G: {{ p.generatingCount | number }} | P: {{ p.publishingCount |
+          number }}</div>
         <div class="progress-bar">
           <div class="fill" [style.width.%]="p.percentComplete" [class.generating]="p.phase === 'generating'"
             [class.publishing]="p.phase === 'publishing'"></div>
@@ -79,8 +80,9 @@
           <span>{{ p.phase | titlecase }} {{ p.percentComplete }}%</span>
         </div>
       </div>
-      <div class="total-summary" *ngIf="burstProgress.length > 1">
-        <strong>Total: {{ totalBurstMessageCount | number }} messages</strong>
+      <div class="total-summary">
+        <div><strong>Total Generated: {{ totalBurstGeneratedCount | number }}</strong></div>
+        <div><strong>Total Published: {{ totalBurstPublishedCount | number }}</strong></div>
       </div>
     </div>
   </div>

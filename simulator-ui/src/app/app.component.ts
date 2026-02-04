@@ -14,7 +14,15 @@ export class AppComponent implements OnInit {
   status: any = null;
   prices: { key: string; bid?: number; ask?: number }[] = [];
   messages: PricingMessage[] = [];
-  burstProgress: { shardIndex: number, percentComplete: number, messageCount: number, phase: string }[] = [];
+  burstProgress: {
+    shardIndex: number,
+    generatingPercent: number,
+    generatingCount: number,
+    publishingPercent: number,
+    publishingCount: number,
+    phase: string,
+    percentComplete: number
+  }[] = [];
   minimizedBurstLog = false;
 
   configJsonString: string = '';
@@ -106,8 +114,12 @@ export class AppComponent implements OnInit {
     return this.burstProgress.some(p => p.percentComplete < 100);
   }
 
-  get totalBurstMessageCount(): number {
-    return this.burstProgress.reduce((sum, p) => sum + p.messageCount, 0);
+  get totalBurstGeneratedCount(): number {
+    return this.burstProgress.reduce((sum, p) => sum + p.generatingCount, 0);
+  }
+
+  get totalBurstPublishedCount(): number {
+    return this.burstProgress.reduce((sum, p) => sum + p.publishingCount, 0);
   }
 
   get averageBurstPercent(): number {

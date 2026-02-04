@@ -40,7 +40,14 @@ export class SimulatorService {
   public prices$ = new BehaviorSubject<Record<string, { bid?: number, ask?: number }>>({});
   public priceUpdate$ = new BehaviorSubject<{ key: string, field: 'bid' | 'ask' } | null>(null);
   public messages$ = new BehaviorSubject<PricingMessage[]>([]);
-  public burstProgress$ = new BehaviorSubject<Map<number, { percentComplete: number, messageCount: number, phase: string }>>(new Map());
+  public burstProgress$ = new BehaviorSubject<Map<number, {
+    generatingPercent: number,
+    generatingCount: number,
+    publishingPercent: number,
+    publishingCount: number,
+    phase: string,
+    percentComplete: number // legacy for backward compatibility if needed in UI
+  }>>(new Map());
 
   private messageLog: PricingMessage[] = [];
   private readonly MAX_LOG_SIZE = 50;
@@ -159,7 +166,30 @@ export class SimulatorService {
 
     socket.on('burstProgress', (progress: { percentComplete: number, messageCount: number, phase: string }) => {
       const current = this.burstProgress$.value;
-      current.set(index, progress);
+      const existing = current.get(index) || {
+        generatingPercent: 0,
+        generatingCount: 0,
+        publishingPercent: 0,
+        publishingCount: 0,
+        phase: 'generating',
+        percentComplete: 0
+      };
+
+      const updated = {
+        ...existing,
+        phase: progress.phase,
+        percentComplete: progress.percentComplete
+      };
+
+      if (progress.phase === 'generating') {
+        updated.generatingCount = progress.messageCount;
+        updated.generatingPercent = progress.percentComplete;
+      } else if (progress.phase === 'publishing') {
+        updated.publishingCount = progress.messageCount;
+        updated.publishingPercent = progress.percentComplete;
+      }
+
+      current.set(index, updated);
       this.burstProgress$.next(new Map(current));
     });
   }
@@ -189,11 +219,27 @@ export class SimulatorService {
   start(): Observable<any[]> {
     this.burstProgress$.next(new Map());
     const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/start`, {}));
-    return forkJoin(reqs);
+    return forkJoin(reqs).pipe(
+      map(res => {
+        const current = this.status$.value;
+        if (current) {
+          this.status$.next({ ...current, isRunning: true });
+        }
+        return res;
+      })
+    );
   }
 
   stop(): Observable<any[]> {
     const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/stop`, {}));
-    return forkJoin(reqs);
+    return forkJoin(reqs).pipe(
+      map(res => {
+        const current = this.status$.value;
+        if (current) {
+          this.status$.next({ ...current, isRunning: false });
+        }
+        return res;
+      })
+    );
   }
 }
