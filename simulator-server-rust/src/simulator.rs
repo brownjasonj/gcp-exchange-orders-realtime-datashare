@@ -7,7 +7,7 @@ use tokio::time::{interval, timeout, Duration};
 use rand::Rng;
 use socketioxide::SocketIo;
 use google_cloud_pubsub::client::{Client, ClientConfig};
-use google_cloud_pubsub::publisher::Publisher;
+use google_cloud_pubsub::publisher::{Publisher, PublisherConfig};
 use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 use tracing::{info, error};
 use chrono::Utc;
@@ -90,9 +90,15 @@ impl Simulator {
                  let _ = old_pub.shutdown().await;
              }
              
-             // Create new publisher
+             // Create new publisher with batch settings from config
+             let publisher_config = PublisherConfig {
+                 bundle_size: state.config.pubsub_batch_messages,
+                 flush_interval: Duration::from_millis(state.config.pubsub_batch_delay_ms),
+                 ..Default::default()
+             };
+             
              // Note: new_publisher starts a background task immediately
-             *pub_guard = Some(topic.new_publisher(None));
+             *pub_guard = Some(topic.new_publisher(Some(publisher_config)));
         }
 
         let my_symbols: Vec<String> = state.config.symbols
@@ -129,6 +135,7 @@ impl Simulator {
         state_guard.running = true;
         let periodicity = state_guard.config.periodicity_ms;
         let burst_size = state_guard.config.burst_size;
+        let batch_size = state_guard.config.burst_publish_batch_size;
         drop(state_guard);
 
         let sim_clone = self.clone();
@@ -147,7 +154,11 @@ impl Simulator {
                 let mut last_reported_percent = 0;
                 
                 // Emit 0% start
-                let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { percent_complete: 0, message_count: 0 }).await;
+                let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
+                    percent_complete: 0, 
+                    message_count: 0,
+                    phase: "generating".to_string()
+                }).await;
 
                 for i in 0..burst_size {
                     if let Some(msg) = sim_clone.generate_message().await {
@@ -159,7 +170,8 @@ impl Simulator {
                         last_reported_percent = percent;
                         let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
                             percent_complete: percent, 
-                            message_count: (i + 1) 
+                            message_count: i + 1,
+                            phase: "generating".to_string()
                         }).await;
                     }
                     
@@ -167,20 +179,85 @@ impl Simulator {
                         info!("Generated {} burst messages", i + 1);
                     }
                 }
-                
-                // Emit 100% complete
+
+                // Final Generation Update (100%)
                 let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
                     percent_complete: 100, 
-                    message_count: burst_msgs.len() as u64 
+                    message_count: burst_msgs.len() as u64,
+                    phase: "generating".to_string()
                 }).await;
                 
                 info!("Burst generation complete. Total: {}", burst_msgs.len());
                 
-                info!("Publishing burst of {} messages...", burst_msgs.len());
-                for msg in burst_msgs {
-                    sim_clone.publish_message(&msg).await;
+                // Start Publishing Phase
+                let publisher_guard = sim_clone.publisher.read().await;
+                if let Some(publisher) = &*publisher_guard {
+                    let publisher = publisher.clone();
+                    // We can drop guard here as we have a clone of the publisher client
+                    drop(publisher_guard);
+
+                    info!("Publishing burst of {} messages...", burst_msgs.len());
+                    
+                    // Emit 0% publishing
+                     let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
+                        percent_complete: 0, 
+                        message_count: 0,
+                        phase: "publishing".to_string()
+                    }).await;
+
+                    let total_msgs = burst_msgs.len();
+                    let mut completed = 0;
+                    last_reported_percent = 0;
+
+                    for chunk in burst_msgs.chunks(batch_size) {
+                        let mut awaiters = Vec::with_capacity(chunk.len());
+
+                        for msg in chunk {
+                            match serde_json::to_vec(msg) {
+                                Ok(data) => {
+                                    // Queue message - this returns an Awaiter immediately
+                                    let awaiter = publisher.publish(PubsubMessage {
+                                        data: data.into(),
+                                        ..Default::default()
+                                    }).await;
+                                    awaiters.push(awaiter);
+                                },
+                                Err(e) => error!("Failed to serialize message: {}", e),
+                            }
+                        }
+
+                        // Now wait for all queued messages in this batch to finish
+                        for awaiter in awaiters {
+                            match awaiter.get().await {
+                                Ok(_) => {
+                                    completed += 1;
+                                    let percent = (completed as f64 / total_msgs as f64 * 100.0) as u8;
+                                     
+                                    if percent >= last_reported_percent + 5 {
+                                        last_reported_percent = percent;
+                                        let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
+                                            percent_complete: percent, 
+                                            message_count: completed as u64,
+                                            phase: "publishing".to_string()
+                                        }).await;
+                                    }
+                                }
+                                Err(e) => error!("Publish error: {}", e),
+                            }
+                        }
+                    }
+                    
+                    // Final publishing update (100%)
+                    let _ = sim_clone.io.emit("burstProgress", &crate::types::BurstProgress { 
+                        percent_complete: 100, 
+                        message_count: completed as u64,
+                        phase: "publishing".to_string()
+                    }).await;
+
+                    info!("Burst publish complete.");
+                } else {
+                    error!("No publisher available for burst!");
                 }
-                info!("Burst complete.");
             }
 
             let mut ticker = interval(Duration::from_millis(periodicity));

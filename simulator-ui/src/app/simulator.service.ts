@@ -40,7 +40,7 @@ export class SimulatorService {
   public prices$ = new BehaviorSubject<Record<string, { bid?: number, ask?: number }>>({});
   public priceUpdate$ = new BehaviorSubject<{ key: string, field: 'bid' | 'ask' } | null>(null);
   public messages$ = new BehaviorSubject<PricingMessage[]>([]);
-  public burstProgress$ = new BehaviorSubject<Map<number, { percentComplete: number, messageCount: number }>>(new Map());
+  public burstProgress$ = new BehaviorSubject<Map<number, { percentComplete: number, messageCount: number, phase: string }>>(new Map());
 
   private messageLog: PricingMessage[] = [];
   private readonly MAX_LOG_SIZE = 50;
@@ -157,7 +157,7 @@ export class SimulatorService {
       this.addMessage(msg);
     });
 
-    socket.on('burstProgress', (progress: { percentComplete: number, messageCount: number }) => {
+    socket.on('burstProgress', (progress: { percentComplete: number, messageCount: number, phase: string }) => {
       const current = this.burstProgress$.value;
       current.set(index, progress);
       this.burstProgress$.next(new Map(current));

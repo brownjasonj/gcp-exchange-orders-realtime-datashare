@@ -14,7 +14,7 @@ export class AppComponent implements OnInit {
   status: any = null;
   prices: { key: string; bid?: number; ask?: number }[] = [];
   messages: PricingMessage[] = [];
-  burstProgress: { shardIndex: number, percentComplete: number, messageCount: number }[] = [];
+  burstProgress: { shardIndex: number, percentComplete: number, messageCount: number, phase: string }[] = [];
   minimizedBurstLog = false;
 
   configJsonString: string = '';

@@ -26,6 +26,9 @@ pub fn load_config(path: &str) -> Config {
         currencies: vec!["USD".to_string()],
         venues: vec!["GCP".to_string()],
         burst_size: 1_000_000,
+        burst_publish_batch_size: 1000,
+        pubsub_batch_messages: 1000,
+        pubsub_batch_delay_ms: 10,
     }
 }
 
