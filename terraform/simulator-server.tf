@@ -37,7 +37,7 @@ locals {
 }
 
 resource "null_resource" "build_and_push_image" {
-  count    = var.simulator_implementation == "node" ? 1 : 0
+  count = var.simulator_implementation == "node" ? 1 : 0
   triggers = {
     image_hash = local.composite_hash
   }
@@ -78,11 +78,11 @@ resource "google_cloud_run_v2_service" "simulator_server" {
         value = "./config.json"
       }
       env {
-        name = "SHARD_INDEX"
+        name  = "SHARD_INDEX"
         value = count.index
       }
       env {
-        name = "TOTAL_SHARDS"
+        name  = "TOTAL_SHARDS"
         value = var.simulator_shards
       }
       ports {

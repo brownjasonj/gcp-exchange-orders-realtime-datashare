@@ -18,8 +18,9 @@ resource "google_dataflow_flex_template_job" "pricing_to_bq_job" {
     tempLocation      = "gs://${google_storage_bucket.dataflow_temp_bucket.name}/temp"
   }
 
-  network    = var.network_id
-  subnetwork = "regions/${var.region}/subnetworks/${var.subnetwork_name}"
+  network                 = var.network_id
+  subnetwork              = "regions/${var.region}/subnetworks/${var.subnetwork_name}"
+  enable_streaming_engine = true
 
   depends_on = [
     google_pubsub_subscription.pubsub_bidask_all_to_bq,

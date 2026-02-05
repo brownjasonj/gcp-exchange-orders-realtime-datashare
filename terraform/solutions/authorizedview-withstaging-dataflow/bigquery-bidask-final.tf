@@ -41,11 +41,11 @@ resource "google_bigquery_table_iam_member" "pubsub_bq_metadata_viewer_final" {
 
 
 resource "google_bigquery_data_transfer_config" "bidask_merge_scheduler" {
-  display_name   = "bidask-merge-scheduler"
-  location       = var.region
-  data_source_id = "scheduled_query"
-  schedule       = "every 15 minutes"
-  project        = var.project_id
+  display_name         = "bidask-merge-scheduler"
+  location             = var.region
+  data_source_id       = "scheduled_query"
+  schedule             = "every 15 minutes"
+  project              = var.project_id
   service_account_name = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 
   params = {
