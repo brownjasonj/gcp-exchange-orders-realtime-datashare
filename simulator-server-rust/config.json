@@ -1,7 +1,7 @@
 {
   "periodicityMs": 50,
   "burstSize": 1000000,
-  "pubsubBatchMessages": 1000,
+  "pubsubBatchMessages": 100000,
   "pubsubBatchDelayMs": 10,
   "priceVariationPercentage": 2,
   "gcpProjectId": "market-one-ip9muxsx",

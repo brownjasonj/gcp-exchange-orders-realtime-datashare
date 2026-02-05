@@ -2,7 +2,7 @@ use crate::types::{Config, PricingMessage, Status, PriceUpdate};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio::time::{interval, timeout, Duration};
 use rand::Rng;
 use socketioxide::SocketIo;
@@ -209,28 +209,49 @@ impl Simulator {
                     let mut completed = 0;
                     last_reported_percent = 0;
 
-                    for chunk in burst_msgs.chunks(batch_size) {
-                        let mut awaiters = Vec::with_capacity(chunk.len());
+                    // Calculate number of parallel tasks for each chunk
+                    // Dividing pubsubBatchMessages by the maximum pubsub batch size (1000)
+                    let max_pubsub_batch_size = 1000;
+                    let num_workers = (batch_size + max_pubsub_batch_size - 1) / max_pubsub_batch_size;
+                    let sub_chunk_size = (batch_size + num_workers - 1) / num_workers;
 
-                        for msg in chunk {
-                            match serde_json::to_vec(msg) {
-                                Ok(data) => {
-                                    // Queue message - this returns an Awaiter immediately
-                                    let awaiter = publisher.publish(PubsubMessage {
-                                        data: data.into(),
-                                        ..Default::default()
-                                    }).await;
-                                    awaiters.push(awaiter);
-                                },
-                                Err(e) => error!("Failed to serialize message: {}", e),
-                            }
+                    info!("Parallelizing burst publishing with ~{} tasks per batch (sub-chunk size: {})", num_workers, sub_chunk_size);
+
+                    for chunk in burst_msgs.chunks(batch_size) {
+                        let mut join_set = JoinSet::new();
+
+                        for sub_chunk in chunk.chunks(sub_chunk_size) {
+                            let publisher = publisher.clone();
+                            let messages = sub_chunk.to_vec();
+                            
+                            join_set.spawn(async move {
+                                let mut awaiters = Vec::with_capacity(messages.len());
+                                for msg in messages {
+                                    if let Ok(data) = serde_json::to_vec(&msg) {
+                                        let awaiter = publisher.publish(PubsubMessage {
+                                            data: data.into(),
+                                            ..Default::default()
+                                        }).await;
+                                        awaiters.push(awaiter);
+                                    }
+                                }
+                                
+                                let mut local_completed = 0;
+                                for awaiter in awaiters {
+                                    match awaiter.get().await {
+                                        Ok(_) => local_completed += 1,
+                                        Err(e) => error!("Burst publish error: {}", e),
+                                    }
+                                }
+                                local_completed
+                            });
                         }
 
-                        // Now wait for all queued messages in this batch to finish
-                        for awaiter in awaiters {
-                            match awaiter.get().await {
-                                Ok(_) => {
-                                    completed += 1;
+                        // Monitor progress as tasks complete
+                        while let Some(res) = join_set.join_next().await {
+                            match res {
+                                Ok(local_success) => {
+                                    completed += local_success;
                                     let percent = (completed as f64 / total_msgs as f64 * 100.0) as u8;
                                      
                                     if percent >= last_reported_percent + 5 {
@@ -241,8 +262,8 @@ impl Simulator {
                                             phase: "publishing".to_string()
                                         }).await;
                                     }
-                                }
-                                Err(e) => error!("Publish error: {}", e),
+                                },
+                                Err(e) => error!("Publishing task failed: {}", e),
                             }
                         }
                     }
