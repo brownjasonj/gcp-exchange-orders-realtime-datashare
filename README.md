@@ -79,4 +79,4 @@ gcloud run services proxy simulator-ui --region=<REGION_FOR_REPLOYMENT> --port=8
 
 Below is a screenshot of the simulator ui
 
-![Simulator UI](images/simulator-ui.png)
+![Simulator UI](images/simulator-screenshot.png)
