@@ -76,3 +76,7 @@ This tunnels traffic from `localhost:8080` to the remote private UI.
 ```bash
 gcloud run services proxy simulator-ui --region=<REGION_FOR_REPLOYMENT> --port=8080
 ```
+
+Below is a screenshot of the simulator ui
+
+![Simulator UI](images/simulator-ui.png)
