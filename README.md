@@ -1,4 +1,4 @@
-<h1>GCP Native Real-Time Data with Delay Features</h1>
+<h1>GCP Native Real-Time Data Streaming</h1>
 
 This repository demonstrates how to use GCP native services to provide real-time data and delays to that data as a steam, history data sets and shares data sets to data consumers without copying those data.  The problem is inspired by the need to provide real-time data to different exchange customers with a  variety of periodicities for different purposes.
 

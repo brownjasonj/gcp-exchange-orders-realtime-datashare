@@ -2,7 +2,8 @@ use crate::types::{Config, PricingMessage, Status, PriceUpdate};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
-use tokio::task::{JoinHandle, JoinSet};
+use tokio::task::{JoinHandle, JoinSet, unconstrained};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::time::{interval, timeout, Duration};
 use rand::Rng;
 use socketioxide::SocketIo;
@@ -28,6 +29,7 @@ pub struct Simulator {
     pubsub: Option<Client>,
     publisher: Arc<RwLock<Option<Publisher>>>,
     task_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+    burst_active: Arc<AtomicBool>,
 }
 
 impl Simulator {
@@ -64,6 +66,7 @@ impl Simulator {
             pubsub,
             publisher: Arc::new(RwLock::new(None)),
             task_handle: Arc::new(Mutex::new(None)),
+            burst_active: Arc::new(AtomicBool::new(false)),
         };
 
         sim.initialize().await;
@@ -189,7 +192,8 @@ impl Simulator {
                 
                 info!("Burst generation complete. Total: {}", burst_msgs.len());
                 
-                // Start Publishing Phase
+                // Start Publishing Phase (Sequential)
+                sim_clone.burst_active.store(true, Ordering::SeqCst);
                 let publisher_guard = sim_clone.publisher.read().await;
                 if let Some(publisher) = &*publisher_guard {
                     let publisher = publisher.clone();
@@ -207,7 +211,7 @@ impl Simulator {
 
                     let total_msgs = burst_msgs.len();
                     let mut completed = 0;
-                    last_reported_percent = 0;
+                    let mut last_reported_percent = 0;
 
                     // Calculate number of parallel tasks for each chunk
                     // Dividing pubsubBatchMessages by the maximum pubsub batch size (1000)
@@ -224,7 +228,7 @@ impl Simulator {
                             let publisher = publisher.clone();
                             let messages = sub_chunk.to_vec();
                             
-                            join_set.spawn(async move {
+                            join_set.spawn(unconstrained(async move {
                                 let mut awaiters = Vec::with_capacity(messages.len());
                                 for msg in messages {
                                     if let Ok(data) = serde_json::to_vec(&msg) {
@@ -244,7 +248,7 @@ impl Simulator {
                                     }
                                 }
                                 local_completed
-                            });
+                            }));
                         }
 
                         // Monitor progress as tasks complete
@@ -279,6 +283,8 @@ impl Simulator {
                 } else {
                     error!("No publisher available for burst!");
                 }
+                sim_clone.burst_active.store(false, Ordering::SeqCst);
+
             }
 
             let mut ticker = interval(Duration::from_millis(periodicity));
@@ -292,6 +298,10 @@ impl Simulator {
 
                 if !is_running {
                     break;
+                }
+                
+                if sim_clone.burst_active.load(Ordering::Relaxed) {
+                    tokio::task::yield_now().await;
                 }
                 
                 if ticker.period().as_millis() as u64 != periodicity_check {
