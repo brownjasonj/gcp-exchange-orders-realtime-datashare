@@ -16,7 +16,7 @@ resource "google_dataflow_flex_template_job" "pricing_to_bq_job" {
     outputTableSpec   = "${var.project_id}:${google_bigquery_table.bidask_all_final.dataset_id}.${google_bigquery_table.bidask_all_final.table_id}"
     tempLocation      = "gs://${google_storage_bucket.dataflow_temp_bucket.name}/temp"
     maxNumWorkers     = "999"
-    workerMachineType = "n2-standard-8"
+    workerMachineType = "t2d-standard-8"
   }
 
   network                 = var.network_id
