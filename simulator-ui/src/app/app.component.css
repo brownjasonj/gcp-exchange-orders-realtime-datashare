@@ -25,13 +25,6 @@ header {
 
 h1 { margin: 0; }
 
-.status-badge {
-  padding: 5px 15px;
-  border-radius: 4px;
-  font-weight: bold;
-}
-.status-badge.running { background-color: #4caf50; color: white; box-shadow: 0 0 10px #4caf50; }
-.status-badge.stopped { background-color: #f44336; color: white; }
 
 main {
   display: grid;
@@ -61,10 +54,6 @@ main {
   transition: all 0.2s;
 }
 
-.btn-start { background-color: #4caf50; color: white; }
-.btn-start:hover { background-color: #43a047; }
-.btn-stop { background-color: #f44336; color: white; }
-.btn-stop:hover { background-color: #d32f2f; }
 
 .config-editor {
   display: flex;
@@ -158,15 +147,11 @@ main {
   color: #f44336;
 }
 
-/* Red for Bid */
 .price-box .value.ask {
   color: #4caf50;
 }
-
-/* Green for Ask */
 .price-box .value.flash {
   background-color: #ffe0b2;
-  /* Light orange flash */
   color: #000;
   border-radius: 4px;
 }
@@ -235,100 +220,4 @@ main {
 .fatal-error p {
   font-size: 1.2em;
   line-height: 1.6;
-}
-
-.burst-log {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 300px;
-  background: #333;
-  border: 1px solid #555;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  overflow: hidden;
-  transition: width 0.3s, height 0.3s;
-  max-height: 400px;
-  display: flex;
-  flex-direction: column;
-}
-
-.burst-log.minimized {
-  width: 200px;
-}
-
-.burst-log .header {
-  background: #444;
-  padding: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-}
-
-.burst-log .header span {
-  font-weight: bold;
-  font-size: 0.9em;
-}
-
-.burst-log .header button {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 1.2em;
-  cursor: pointer;
-}
-
-.burst-log .content {
-  padding: 15px;
-  overflow-y: auto;
-}
-
-.shard-progress {
-  margin-bottom: 15px;
-}
-
-.shard-label {
-  font-size: 0.8em;
-  color: #ddd;
-  margin-bottom: 5px;
-}
-
-.total-summary {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #444;
-  text-align: right;
-  font-size: 0.9em;
-  color: #4caf50;
-}
-
-.progress-bar {
-  height: 10px;
-  background: #222;
-  border-radius: 5px;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-
-.progress-bar .fill {
-  height: 100%;
-  background: #4caf50;
-  transition: width 0.2s ease;
-}
-
-.progress-bar .fill.generating {
-  background: #2196f3;
-}
-
-.progress-bar .fill.publishing {
-  background: #4caf50;
-}
-.details {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8em;
-  color: #aaa;
 }
