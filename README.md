@@ -39,6 +39,9 @@ What is the message data volume and frequency?
 <h1>Evaluate Solutions</h1>
 This repository provides a number of solutions to evaluate for the problem statement.  A data simulator and ui are provided to generate and publish data to a pub/sub topic.
 
+### Recommended Solution Architecture
+![Architecture](images/realtime-streaming-architecture.png)
+
 ## Pre-requisites
 
 <ul>
