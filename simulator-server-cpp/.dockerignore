@@ -1,0 +1,11 @@
+build/
+.git/
+.terraform/
+.agent/
+.gemini/
+.idea/
+.vscode/
+venv/
+node_modules/
+*.pyc
+__pycache__/

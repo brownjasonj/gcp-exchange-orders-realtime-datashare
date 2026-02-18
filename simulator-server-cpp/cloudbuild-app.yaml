@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', '${_TAG}', '--build-arg', 'SDK_BASE=${_SDK_BASE}', '.']
+images:
+- '${_TAG}'

@@ -34,11 +34,11 @@ variable "simulator_shards" {
 }
 
 variable "simulator_implementation" {
-  description = "The implementation of the simulator server to deploy. Options: 'node' or 'rust'"
+  description = "The implementation of the simulator server to deploy. Options: 'node', 'rust', or 'cpp'"
   type        = string
   default     = "node"
   validation {
-    condition     = contains(["node", "rust"], var.simulator_implementation)
-    error_message = "The simulator_implementation must be either 'node' or 'rust'."
+    condition     = contains(["node", "rust", "cpp"], var.simulator_implementation)
+    error_message = "The simulator_implementation must be either 'node', 'rust', or 'cpp'."
   }
 }

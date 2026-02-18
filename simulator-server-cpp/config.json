@@ -1,0 +1,9 @@
+{
+  "periodicityMs": 1000,
+  "priceVariationPercentage": 0.5,
+  "gcpProjectId": "market-one-ip9muxsx",
+  "symbols": ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"],
+  "currencies": ["USD", "EUR"],
+  "venues": ["NASDAQ", "NYSE"],
+  "burstSize": 1000
+}

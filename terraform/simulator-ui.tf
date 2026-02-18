@@ -50,26 +50,26 @@ resource "google_cloudfunctions2_function" "simulator_ui" {
     timeout_seconds    = 60
     environment_variables = {
       PROJECT_ID = var.project_id
-      API_URLS   = join(",", concat(google_cloud_run_v2_service.simulator_server[*].uri, google_cloud_run_v2_service.simulator_server_rust[*].uri))
+      API_URLS   = join(",", concat(google_cloud_run_v2_service.simulator_server[*].uri, google_cloud_run_v2_service.simulator_server_rust[*].uri, google_cloud_run_v2_service.simulator_server_cpp[*].uri))
     }
   }
 
   depends_on = [
     google_cloud_run_v2_service.simulator_server,
     google_cloud_run_v2_service.simulator_server_rust,
+    google_cloud_run_v2_service.simulator_server_cpp,
     google_storage_bucket_object.simulator_ui_object
   ]
 }
 
 # Allow unauthenticated access to support public UI access and WebSockets
-# Resource commented out due to Organization Policy blocking allUsers
-# resource "google_cloud_run_service_iam_member" "simulator_ui_public_access" {
-#   location = google_cloudfunctions2_function.simulator_ui.location
-#   service  = google_cloudfunctions2_function.simulator_ui.name
-#   role     = "roles/run.invoker"
-#   member   = "allUsers"
-# 
-#   depends_on = [
-#     google_cloudfunctions2_function.simulator_ui
-#   ]
-# }
+resource "google_cloud_run_v2_service_iam_member" "simulator_ui_public_access" {
+  location = google_cloudfunctions2_function.simulator_ui.location
+  name     = google_cloudfunctions2_function.simulator_ui.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+
+  depends_on = [
+    google_cloudfunctions2_function.simulator_ui
+  ]
+}

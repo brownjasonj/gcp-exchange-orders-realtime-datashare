@@ -18,6 +18,7 @@ Historic data consists of all past ticking data from the exchange and made avail
 Creating a GCP cloud native solution for sharing historic data sets to any GCP customer.  The solution should satisfy the following set of requirements:
 
 <ul>
+<li>Pre-market volume "burst" of data needs to be streamed and stored with in n seconds of the market opening</li>
 <li>Accept a price data via a live streaming service</li>
 <li>Provide two data sets with distinct access controls</li>
 <li>All live data up to X years with the latest being no older than Y seconds</li>
@@ -31,16 +32,34 @@ Creating a GCP cloud native solution for sharing historic data sets to any GCP c
 Compliance policy definition and implementation of data consumer access controls.
 Integration of data consumption billing back to data producer billing systems
 
-<h4>Open Questions</h4>
-What are consumer data consumption patterns for these data sets?
-What is the message data volume and frequency?
-
-
 <h1>Evaluate Solutions</h1>
 This repository provides a number of solutions to evaluate for the problem statement.  A data simulator and ui are provided to generate and publish data to a pub/sub topic.
 
 ### Recommended Solution Architecture
 ![Architecture](images/realtime-streaming-architecture.png)
+
+#### Considerations
+<p>One of the great features of GCP streaming is it's scalability under variable workloads.  The components used are designed for such scale, but come preconfigured for ease of use.  As a consequence it is important to understand what needs to be considered in this use case.</p>
+
+<p>There are two essential phases to the exchange use case.  The first is the pre-market "burst" of data that needs to be streamed and stored with in n seconds of the market opening.  The second is the continuous streaming of data throughout the day.  The solution needs to be able to handle both of these phases.</p>
+
+<p>We consider the first case the most challenging one.  The burst of data can be very large and needs to be processed and stored with in a short period of time.  The second case is more straightforward as the data is streamed continuously throughout the day.</p>
+
+<p>To handle the first case the configuration of each component and behaviour of the publisher of the data is important</p>
+
+<ul>
+<li>Pubsub just scales, but is dependent on the publisher behaviour. Use message batching of 1000 messages and parallelize to maximize number batches being pushed.</li>
+<li>Dataflow can scale, but needs to be configured correctly.  
+  <ul>
+    <li>Maximize the number of possible worker nodes, this is the maximum number of vms that will be used to process the data (we set this to 999)</li>
+    <li>Minmum number of worker nodes was set to 1.  More results in higher costs through the day as it is, as suggested, the minimum number of vms that will be running irrespective of message volume
+    </li>
+    <li>Worker machine type trade-off is trickier.  Larger machines can handle more processing, but take longer to to provision when scaling.  This is a tricky trade-off since in our use case the initial burst is uniform and needs peak processing immediately.  We opteed for an t2d-standard-8 machine type.  This is a good balance between processing power and provisioning time. Note that you may need to increase your organizational quotas.  The peak number of vms in this case if 8000, 1000 workers each with 8 cores.</li>
+  </ul>
+</li>
+<li>BigQuery can handle large amounts of data, but you will neeed to ensure that default write quotas are increased.  Publishing 100's millions of messages each of around 200 bytes is 100 GB/second. </li>
+</ul
+
 
 ## Pre-requisites
 
