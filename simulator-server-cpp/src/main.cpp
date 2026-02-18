@@ -13,31 +13,22 @@ struct CORSMiddleware {
     struct context {};
 
     void before_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        const std::string& origin = req.get_header_value("Origin");
-        if (!origin.empty()) {
-            res.add_header("Access-Control-Allow-Origin", origin);
-            res.add_header("Access-Control-Allow-Credentials", "true");
-        } else {
-            res.add_header("Access-Control-Allow-Origin", "*");
-        }
-
         if (req.method == crow::HTTPMethod::Options) {
-            res.add_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            res.add_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-            res.code = 204;
+            res.code = 200;
+            res.body = "OK";
+            res.add_header("Access-Control-Allow-Origin", "*");
+            res.add_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+            res.add_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+            res.add_header("Access-Control-Max-Age", "3600");
             res.end();
         }
     }
 
     void after_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        if (!res.headers.count("Access-Control-Allow-Origin")) {
-            const std::string& origin = req.get_header_value("Origin");
-            if (!origin.empty()) {
-                res.add_header("Access-Control-Allow-Origin", origin);
-                res.add_header("Access-Control-Allow-Credentials", "true");
-            } else {
-                res.add_header("Access-Control-Allow-Origin", "*");
-            }
+        if (req.method != crow::HTTPMethod::Options) {
+            res.add_header("Access-Control-Allow-Origin", "*");
+            res.add_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+            res.add_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
         }
     }
 };
@@ -68,12 +59,13 @@ int main(int argc, char* argv[]) {
     if (const char* tb_id = std::getenv("BIGQUERY_TABLE_ID")) config.bigquery_table_id = tb_id;
     
     // Default values if still empty
-    if (config.bigquery_dataset_id.empty()) config.bigquery_dataset_id = "simulator_data";
-    if (config.bigquery_table_id.empty()) config.bigquery_table_id = "order_ticks_delay";
+    if (config.bigquery_dataset_id.empty()) config.bigquery_dataset_id = "paywall_datasets";
+    if (config.bigquery_table_id.empty()) config.bigquery_table_id = "bidask_all_staged";
 
     simulator::Simulator sim(config);
 
     crow::App<CORSMiddleware> app;
+    app.loglevel(crow::LogLevel::Debug);
 
     // WebSocket state
     static std::mutex connections_mutex;
@@ -85,21 +77,27 @@ int main(int argc, char* argv[]) {
             std::lock_guard<std::mutex> lock(connections_mutex);
             std::string payload = "42[\"message\"," + nlohmann::json(msg).dump() + "]";
             for (auto conn : connections) {
-                conn->send_text(payload);
+                try {
+                    conn->send_text(payload);
+                } catch (...) {}
             }
         },
         [](const simulator::PriceUpdate& pu) {
             std::lock_guard<std::mutex> lock(connections_mutex);
             std::string payload = "42[\"priceUpdate\"," + nlohmann::json(pu).dump() + "]";
             for (auto conn : connections) {
-                conn->send_text(payload);
+                try {
+                    conn->send_text(payload);
+                } catch (...) {}
             }
         },
         [](const simulator::BurstProgress& prog) {
             std::lock_guard<std::mutex> lock(connections_mutex);
             std::string payload = "42[\"burstProgress\"," + nlohmann::json(prog).dump() + "]";
             for (auto conn : connections) {
-                conn->send_text(payload);
+                try {
+                    conn->send_text(payload);
+                } catch (...) {}
             }
         }
     );
@@ -136,12 +134,13 @@ int main(int argc, char* argv[]) {
         });
 
     // REST Endpoints
-    CROW_ROUTE(app, "/api/status").methods(crow::HTTPMethod::GET)([&sim]() {
-        auto status_json = nlohmann::json(sim.GetStatus()).dump();
-        crow::response res(status_json);
-        res.add_header("Content-Type", "application/json");
-        return res;
-    });
+    CROW_ROUTE(app, "/api/status")
+        .methods(crow::HTTPMethod::GET)
+        ([&sim](const crow::request& /*req*/) {
+            crow::response res(nlohmann::json(sim.GetStatus()).dump());
+            res.add_header("Content-Type", "application/json");
+            return res;
+        });
 
     // Health check endpoints
     CROW_ROUTE(app, "/")([]() {
@@ -152,71 +151,92 @@ int main(int argc, char* argv[]) {
         return "OK";
     });
 
-    CROW_ROUTE(app, "/api/prices").methods(crow::HTTPMethod::GET)([&sim]() {
-        auto prices_json = nlohmann::json(sim.GetPrices()).dump();
-        crow::response res(prices_json);
-        res.add_header("Content-Type", "application/json");
-        return res;
-    });
+    CROW_ROUTE(app, "/api/prices")
+        .methods(crow::HTTPMethod::GET)
+        ([&sim](const crow::request& /*req*/) {
+            crow::response res(nlohmann::json(sim.GetPrices()).dump());
+            res.add_header("Content-Type", "application/json");
+            return res;
+        });
 
-    CROW_ROUTE(app, "/api/config").methods(crow::HTTPMethod::GET)([&sim]() {
-        auto config_json = nlohmann::json(sim.GetStatus().config).dump();
-        crow::response res(config_json);
-        res.add_header("Content-Type", "application/json");
-        return res;
-    });
+    CROW_ROUTE(app, "/api/config")
+        .methods(crow::HTTPMethod::GET, crow::HTTPMethod::POST)
+        ([&sim](const crow::request& req) {
+            if (req.method == crow::HTTPMethod::GET) {
+                crow::response res(nlohmann::json(sim.GetStatus().config).dump());
+                res.add_header("Content-Type", "application/json");
+                return res;
+            } else {
+                try {
+                    auto body = nlohmann::json::parse(req.body);
+                    simulator::Config new_config = body.get<simulator::Config>();
+                    sim.UpdateConfig(new_config);
 
-    CROW_ROUTE(app, "/api/config").methods(crow::HTTPMethod::POST)([&sim](const crow::request& req) {
-        try {
-            auto body = nlohmann::json::parse(req.body);
-            simulator::Config new_config = body.get<simulator::Config>();
-            sim.UpdateConfig(new_config);
+                    // Broadcast status change
+                    {
+                        std::lock_guard<std::mutex> lock(connections_mutex);
+                        std::string payload = "42[\"status\"," + nlohmann::json(sim.GetStatus()).dump() + "]";
+                        for (auto conn : connections) {
+                            try {
+                                conn->send_text(payload);
+                            } catch (...) {}
+                        }
+                    }
 
+                    crow::response res(200, "{\"success\": true}");
+                    res.add_header("Content-Type", "application/json");
+                    return res;
+                } catch (const std::exception& e) {
+                    std::cerr << "Error updating config: " << e.what() << std::endl;
+                    crow::response res(400, "{\"error\": \"" + std::string(e.what()) + "\"}");
+                    res.add_header("Content-Type", "application/json");
+                    return res;
+                }
+            }
+        });
+
+    CROW_ROUTE(app, "/api/start")
+        .methods(crow::HTTPMethod::POST)
+        ([&sim](const crow::request& /*req*/) {
+            std::cout << "Received start request" << std::endl;
+            sim.Start();
+            
             // Broadcast status change
             {
                 std::lock_guard<std::mutex> lock(connections_mutex);
                 std::string payload = "42[\"status\"," + nlohmann::json(sim.GetStatus()).dump() + "]";
-                for (auto conn : connections) conn->send_text(payload);
+                for (auto conn : connections) {
+                    try {
+                        conn->send_text(payload);
+                    } catch (...) {}
+                }
             }
 
             crow::response res(200, "{\"success\": true}");
             res.add_header("Content-Type", "application/json");
             return res;
-        } catch (const std::exception& e) {
-            return crow::response(400, "{\"error\": \"" + std::string(e.what()) + "\"}");
-        }
-    });
+        });
 
-    CROW_ROUTE(app, "/api/start").methods(crow::HTTPMethod::POST)([&sim]() {
-        std::cout << "Received start request" << std::endl;
-        sim.Start();
-        
-        // Broadcast status change
-        {
-            std::lock_guard<std::mutex> lock(connections_mutex);
-            std::string payload = "42[\"status\"," + nlohmann::json(sim.GetStatus()).dump() + "]";
-            for (auto conn : connections) conn->send_text(payload);
-        }
+    CROW_ROUTE(app, "/api/stop")
+        .methods(crow::HTTPMethod::POST)
+        ([&sim](const crow::request& /*req*/) {
+            sim.Stop();
+            
+            // Broadcast status change
+            {
+                std::lock_guard<std::mutex> lock(connections_mutex);
+                std::string payload = "42[\"status\"," + nlohmann::json(sim.GetStatus()).dump() + "]";
+                for (auto conn : connections) {
+                    try {
+                        conn->send_text(payload);
+                    } catch (...) {}
+                }
+            }
 
-        crow::response res(200, "{\"success\": true}");
-        res.add_header("Content-Type", "application/json");
-        return res;
-    });
-
-    CROW_ROUTE(app, "/api/stop").methods(crow::HTTPMethod::POST)([&sim]() {
-        sim.Stop();
-        
-        // Broadcast status change
-        {
-            std::lock_guard<std::mutex> lock(connections_mutex);
-            std::string payload = "42[\"status\"," + nlohmann::json(sim.GetStatus()).dump() + "]";
-            for (auto conn : connections) conn->send_text(payload);
-        }
-
-        crow::response res(200, "{\"success\": true, \"message\": \"Simulator stopped\"}");
-        res.add_header("Content-Type", "application/json");
-        return res;
-    });
+            crow::response res(200, "{\"success\": true, \"message\": \"Simulator stopped\"}");
+            res.add_header("Content-Type", "application/json");
+            return res;
+        });
 
     // Get port from environment variable or use default
     const char* port_env = std::getenv("PORT");
@@ -227,4 +247,6 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
+
 

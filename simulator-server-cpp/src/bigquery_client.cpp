@@ -47,51 +47,59 @@ bool BigQueryClient::StreamMessages(const std::vector<PricingMessage>& messages)
     }
     
     try {
+        std::cout << "[BigQuery] Opening stream to " << table_name_ << "..." << std::endl;
+        
         // Create the bidirectional stream
         auto stream_future = client_->AsyncAppendRows();
         auto stream = stream_future.get();
         
         if (!stream) {
-            std::cerr << "Failed to create BigQuery stream" << std::endl;
+            std::cerr << "[BigQuery] Error: Failed to create BigQuery stream" << std::endl;
             return false;
         }
 
         // Start the stream
         if (!stream->Start().get()) {
-            std::cerr << "Failed to start BigQuery stream" << std::endl;
+            std::cerr << "[BigQuery] Error: Failed to start BigQuery stream" << std::endl;
             return false;
         }
 
         // Send the request
+        std::cout << "[BigQuery] Sending " << messages.size() << " rows..." << std::endl;
         if (!stream->Write(request, grpc::WriteOptions()).get()) {
-            std::cerr << "Failed to write to BigQuery stream" << std::endl;
+            std::cerr << "[BigQuery] Error: Failed to write to BigQuery stream" << std::endl;
             return false;
         }
     
-    // Read the response
-    auto response = stream->Read().get();
-    if (!response) {
-        auto status = stream->Finish().get();
-        std::cerr << "Failed to read response from BigQuery stream: " << status.message() << std::endl;
-        return false;
-    }
+        // Read the response
+        auto response = stream->Read().get();
+        if (!response) {
+            auto status = stream->Finish().get();
+            std::cerr << "[BigQuery] Error: Failed to read response from BigQuery stream: " << status.message() << " (code: " << (int)status.code() << ")" << std::endl;
+            return false;
+        }
 
-    // Close the stream
-    if (!stream->WritesDone().get()) {
-        std::cerr << "Failed to close BigQuery stream writes" << std::endl;
-        return false;
-    }
+        if (response->has_error()) {
+            std::cerr << "[BigQuery] Error in response: " << response->error().message() << std::endl;
+            return false;
+        }
+
+        // Close the stream
+        if (!stream->WritesDone().get()) {
+            std::cerr << "[BigQuery] Error: Failed to close BigQuery stream writes" << std::endl;
+            return false;
+        }
 
         auto status = stream->Finish().get();
         if (!status.ok()) {
-            std::cerr << "BigQuery stream finished with error: " << status.message() << std::endl;
+            std::cerr << "[BigQuery] Error: BigQuery stream finished with error: " << status.message() << std::endl;
             return false;
         }
 
         std::cout << "[BigQuery] Successfully streamed " << messages.size() << " messages to " << table_name_ << std::endl;
         return true; 
     } catch (const std::exception& e) {
-        std::cerr << "Exception in BigQuery StreamMessages: " << e.what() << std::endl;
+        std::cerr << "[BigQuery] Exception in StreamMessages: " << e.what() << std::endl;
         return false;
     }
 }

@@ -82,11 +82,11 @@ resource "google_cloud_run_v2_service" "simulator_server_cpp" {
       }
       env {
         name  = "BIGQUERY_DATASET_ID"
-        value = "simulator_data"
+        value = "paywall_datasets"
       }
       env {
         name  = "BIGQUERY_TABLE_ID"
-        value = "order_ticks_delay"
+        value = "bidask_all_staged"
       }
       env {
         name  = "SHARD_INDEX"
