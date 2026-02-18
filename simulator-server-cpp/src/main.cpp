@@ -13,15 +13,13 @@ struct CORSMiddleware {
     struct context {};
 
     void before_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        // Reflect origin for credentials support
         const std::string& origin = req.get_header_value("Origin");
         if (!origin.empty()) {
             res.add_header("Access-Control-Allow-Origin", origin);
+            res.add_header("Access-Control-Allow-Credentials", "true");
         } else {
             res.add_header("Access-Control-Allow-Origin", "*");
         }
-        
-        res.add_header("Access-Control-Allow-Credentials", "true");
 
         if (req.method == crow::HTTPMethod::Options) {
             res.add_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -32,16 +30,15 @@ struct CORSMiddleware {
     }
 
     void after_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        // Ensure header is set on all responses if not already (reflecting origin if possible)
         if (!res.headers.count("Access-Control-Allow-Origin")) {
             const std::string& origin = req.get_header_value("Origin");
             if (!origin.empty()) {
                 res.add_header("Access-Control-Allow-Origin", origin);
+                res.add_header("Access-Control-Allow-Credentials", "true");
             } else {
                 res.add_header("Access-Control-Allow-Origin", "*");
             }
         }
-        res.add_header("Access-Control-Allow-Credentials", "true");
     }
 };
 
@@ -191,6 +188,7 @@ int main(int argc, char* argv[]) {
     });
 
     CROW_ROUTE(app, "/api/start").methods(crow::HTTPMethod::POST)([&sim]() {
+        std::cout << "Received start request" << std::endl;
         sim.Start();
         
         // Broadcast status change
@@ -200,7 +198,7 @@ int main(int argc, char* argv[]) {
             for (auto conn : connections) conn->send_text(payload);
         }
 
-        crow::response res(200, "{\"success\": true, \"message\": \"Simulator started\"}");
+        crow::response res(200, "{\"success\": true}");
         res.add_header("Content-Type", "application/json");
         return res;
     });
