@@ -23,8 +23,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY --from=builder /usr/local /usr/local
 COPY --from=builder /app/build/simulator-server-cpp .
 COPY --from=builder /app/config.json .
+
+RUN ldconfig
 
 EXPOSE 8080
 CMD ["./simulator-server-cpp"]

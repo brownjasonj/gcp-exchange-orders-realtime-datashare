@@ -106,8 +106,8 @@ resource "google_cloud_run_v2_service" "simulator_server_cpp" {
         }
       }
       startup_probe {
-        initial_delay_seconds = 5
-        timeout_seconds       = 5
+        initial_delay_seconds = 60
+        timeout_seconds       = 60
         period_seconds        = 10
         failure_threshold     = 10
         tcp_socket {

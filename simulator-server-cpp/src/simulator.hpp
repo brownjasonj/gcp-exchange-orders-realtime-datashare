@@ -33,6 +33,7 @@ public:
     }
 
 private:
+    void Initialize();
     void RunLoop();
     void HandleBurst();
     PricingMessage GenerateMessage();

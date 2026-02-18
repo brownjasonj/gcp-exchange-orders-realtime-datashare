@@ -9,36 +9,54 @@ namespace simulator {
 Simulator::Simulator(Config config) 
     : config_(std::move(config)), rng_(std::random_device{}()) {
     
-    bq_client_ = std::make_unique<BigQueryClient>(
-        config_.gcp_project_id, 
-        config_.bigquery_dataset_id, 
-        config_.bigquery_table_id
-    );
-
-    // Initialize prices
-    std::uniform_real_distribution<double> dist(10.0, 1000.0);
-    for (const auto& symbol : config_.symbols) {
-        for (const auto& currency : config_.currencies) {
-            std::string key = symbol + ":" + currency;
-            double initial_price = std::round(dist(rng_) * 100.0) / 100.0;
-            prices_[key] = initial_price;
-            pairs_.push_back({symbol, currency});
-        }
-    }
+    Initialize();
 }
 
 Simulator::~Simulator() {
     Stop();
 }
 
+void Simulator::Initialize() {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    
+    // Sharding logic
+    const char* shard_index_env = std::getenv("SHARD_INDEX");
+    const char* total_shards_env = std::getenv("TOTAL_SHARDS");
+    int shard_index = shard_index_env ? std::stoi(shard_index_env) : 0;
+    int total_shards = total_shards_env ? std::stoi(total_shards_env) : 1;
+
+    std::cout << "Initializing C++ Simulator Shard " << shard_index << "/" << total_shards << std::endl;
+
+    pairs_.clear();
+    prices_.clear();
+
+    bq_client_ = std::make_unique<BigQueryClient>(
+        config_.gcp_project_id, 
+        config_.bigquery_dataset_id, 
+        config_.bigquery_table_id
+    );
+
+    std::uniform_real_distribution<double> dist(10.0, 1000.0);
+    
+    for (size_t i = 0; i < config_.symbols.size(); ++i) {
+        if (static_cast<int>(i % total_shards) == shard_index) {
+            const auto& symbol = config_.symbols[i];
+            for (const auto& currency : config_.currencies) {
+                std::string key = symbol + ":" + currency;
+                double initial_price = std::round(dist(rng_) * 100.0) / 100.0;
+                prices_[key] = initial_price;
+                pairs_.push_back({symbol, currency});
+            }
+        }
+    }
+    
+    std::cout << "Simulator initialized with " << pairs_.size() << " pairs." << std::endl;
+}
+
 void Simulator::Start() {
     if (running_.exchange(true)) return;
     
     loop_thread_ = std::thread(&Simulator::RunLoop, this);
-    
-    if (config_.burst_size > 0) {
-        burst_thread_ = std::thread(&Simulator::HandleBurst, this);
-    }
 }
 
 void Simulator::Stop() {
@@ -61,34 +79,18 @@ void Simulator::UpdateConfig(Config config) {
     bool was_running = running_;
     if (was_running) Stop();
     
-    {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        config_ = std::move(config);
-        
-        // Re-init
-        pairs_.clear();
-        prices_.clear();
-        std::uniform_real_distribution<double> dist(10.0, 1000.0);
-        for (const auto& symbol : config_.symbols) {
-            for (const auto& currency : config_.currencies) {
-                std::string key = symbol + ":" + currency;
-                double initial_price = std::round(dist(rng_) * 100.0) / 100.0;
-                prices_[key] = initial_price;
-                pairs_.push_back({symbol, currency});
-            }
-        }
-        
-        bq_client_ = std::make_unique<BigQueryClient>(
-            config_.gcp_project_id, 
-            config_.bigquery_dataset_id, 
-            config_.bigquery_table_id
-        );
-    }
+    config_ = std::move(config);
+    Initialize();
     
     if (was_running) Start();
 }
 
 void Simulator::RunLoop() {
+    // Handle burst first if requested
+    if (config_.burst_size > 0) {
+        HandleBurst();
+    }
+
     while (running_) {
         auto start = std::chrono::steady_clock::now();
         
@@ -176,6 +178,7 @@ void Simulator::Tick() {
     if (pu_cb_) pu_cb_({msg.symbol, msg.currency, msg.price, msg.bid_ask});
     
     bq_client_->StreamMessage(msg);
-}
+} 
+
 
 } // namespace simulator

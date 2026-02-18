@@ -4,11 +4,11 @@ package simulator;
 
 message PricingMessageProto {
     string symbol = 1;
-    uint64 sequence_number = 2;
+    int64 sequenceNumber = 2;
     double price = 3;
     string currency = 4;
     string venue = 5;
     string timestamp = 6;
-    string bid_ask = 7;
-    uint64 quantity = 8;
+    string bidAsk = 7;
+    int64 quantity = 8;
 }

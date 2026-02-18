@@ -18,6 +18,9 @@ struct Config {
     std::vector<std::string> currencies;
     std::vector<std::string> venues;
     uint64_t burst_size = 1000;
+    std::string pubsub_topic_name;
+    uint64_t pubsub_batch_messages = 1000;
+    uint64_t pubsub_batch_delay_ms = 10;
 
     // Manual to_json to match UI camelCase requirements
     friend void to_json(nlohmann::json& j, const Config& c) {
@@ -30,7 +33,10 @@ struct Config {
             {"symbols", c.symbols},
             {"currencies", c.currencies},
             {"venues", c.venues},
-            {"burstSize", c.burst_size}
+            {"burstSize", c.burst_size},
+            {"pubsubTopicName", c.pubsub_topic_name},
+            {"pubsubBatchMessages", c.pubsub_batch_messages},
+            {"pubsubBatchDelayMs", c.pubsub_batch_delay_ms}
         };
     }
 
@@ -38,12 +44,15 @@ struct Config {
         c.periodicity_ms = j.value("periodicityMs", 1000UL);
         c.price_variation_percentage = j.value("priceVariationPercentage", 0.5);
         c.gcp_project_id = j.value("gcpProjectId", "");
-        c.bigquery_dataset_id = j.value("bigqueryDatasetId", "");
-        c.bigquery_table_id = j.value("bigqueryTableId", "");
+        c.bigquery_dataset_id = j.value("bigqueryDatasetId", "simulator_data");
+        c.bigquery_table_id = j.value("bigqueryTableId", "order_ticks_delay");
         if (j.contains("symbols")) c.symbols = j.at("symbols").get<std::vector<std::string>>();
         if (j.contains("currencies")) c.currencies = j.at("currencies").get<std::vector<std::string>>();
         if (j.contains("venues")) c.venues = j.at("venues").get<std::vector<std::string>>();
         c.burst_size = j.value("burstSize", 1000UL);
+        c.pubsub_topic_name = j.value("pubsubTopicName", "");
+        c.pubsub_batch_messages = j.value("pubsubBatchMessages", 1000UL);
+        c.pubsub_batch_delay_ms = j.value("pubsubBatchDelayMs", 10UL);
     }
 };
 

@@ -28,34 +28,45 @@ bool BigQueryClient::StreamMessages(const std::vector<PricingMessage>& messages)
     
     auto* proto_rows = request.mutable_proto_rows();
     
+    // Set the writer schema - this is required for the Storage Write API
+    auto* writer_schema = proto_rows->mutable_writer_schema();
+    PricingMessageProto::descriptor()->CopyTo(writer_schema->mutable_proto_descriptor());
+
     for (const auto& msg : messages) {
         PricingMessageProto proto_msg;
         proto_msg.set_symbol(msg.symbol);
-        proto_msg.set_sequence_number(msg.sequence_number);
+        proto_msg.set_sequencenumber(msg.sequence_number);
         proto_msg.set_price(msg.price);
         proto_msg.set_currency(msg.currency);
         proto_msg.set_venue(msg.venue);
         proto_msg.set_timestamp(msg.timestamp);
-        proto_msg.set_bid_ask(msg.bid_ask);
+        proto_msg.set_bidask(msg.bid_ask);
         proto_msg.set_quantity(msg.quantity);
         
         proto_rows->mutable_rows()->add_serialized_rows(proto_msg.SerializeAsString());
     }
     
-    // Create the bidirectional stream
-    auto stream = client_->AsyncAppendRows().get();
-    
-    // Start the stream
-    if (!stream->Start().get()) {
-        std::cerr << "Failed to start BigQuery stream" << std::endl;
-        return false;
-    }
+    try {
+        // Create the bidirectional stream
+        auto stream_future = client_->AsyncAppendRows();
+        auto stream = stream_future.get();
+        
+        if (!stream) {
+            std::cerr << "Failed to create BigQuery stream" << std::endl;
+            return false;
+        }
 
-    // Send the request
-    if (!stream->Write(request, grpc::WriteOptions()).get()) {
-        std::cerr << "Failed to write to BigQuery stream" << std::endl;
-        return false;
-    }
+        // Start the stream
+        if (!stream->Start().get()) {
+            std::cerr << "Failed to start BigQuery stream" << std::endl;
+            return false;
+        }
+
+        // Send the request
+        if (!stream->Write(request, grpc::WriteOptions()).get()) {
+            std::cerr << "Failed to write to BigQuery stream" << std::endl;
+            return false;
+        }
     
     // Read the response
     auto response = stream->Read().get();
@@ -71,14 +82,18 @@ bool BigQueryClient::StreamMessages(const std::vector<PricingMessage>& messages)
         return false;
     }
 
-    auto status = stream->Finish().get();
-    if (!status.ok()) {
-        std::cerr << "BigQuery stream finished with error: " << status.message() << std::endl;
+        auto status = stream->Finish().get();
+        if (!status.ok()) {
+            std::cerr << "BigQuery stream finished with error: " << status.message() << std::endl;
+            return false;
+        }
+
+        std::cout << "[BigQuery] Successfully streamed " << messages.size() << " messages to " << table_name_ << std::endl;
+        return true; 
+    } catch (const std::exception& e) {
+        std::cerr << "Exception in BigQuery StreamMessages: " << e.what() << std::endl;
         return false;
     }
-
-    std::cout << "[BigQuery] Successfully streamed " << messages.size() << " messages to " << table_name_ << std::endl;
-    return true; 
 }
 
 bool BigQueryClient::StreamMessage(const PricingMessage& message) {
