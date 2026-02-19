@@ -9,29 +9,8 @@
 
 using json = nlohmann::json;
 
-struct CORSMiddleware {
-    struct context {};
+#include "crow/middlewares/cors.h"
 
-    void before_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        if (req.method == crow::HTTPMethod::Options) {
-            res.code = 200;
-            res.body = "OK";
-            res.add_header("Access-Control-Allow-Origin", "*");
-            res.add_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-            res.add_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-            res.add_header("Access-Control-Max-Age", "3600");
-            res.end();
-        }
-    }
-
-    void after_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        if (req.method != crow::HTTPMethod::Options) {
-            res.add_header("Access-Control-Allow-Origin", "*");
-            res.add_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-            res.add_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-        }
-    }
-};
 
 int main(int argc, char* argv[]) {
     std::cout << "Starting boot sequence..." << std::endl;
@@ -64,7 +43,17 @@ int main(int argc, char* argv[]) {
 
     simulator::Simulator sim(config);
 
-    crow::App<CORSMiddleware> app;
+    // Added dummy comment v2 to force Terraform rebuild after patching Crow's 204 handler
+    crow::App<crow::CORSHandler> app; // Enable CORS
+
+    // Customize CORS
+    auto& cors = app.get_middleware<crow::CORSHandler>();
+    cors
+      .global()
+        .headers("Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept", "Access-Control-Request-Method", "Access-Control-Request-Headers")
+        .methods("GET"_method, "POST"_method, "OPTIONS"_method, "PUT"_method, "DELETE"_method)
+        .origin("*");
+
     app.loglevel(crow::LogLevel::Debug);
 
     // WebSocket state
@@ -136,7 +125,7 @@ int main(int argc, char* argv[]) {
     // REST Endpoints
     CROW_ROUTE(app, "/api/status")
         .methods(crow::HTTPMethod::GET)
-        ([&sim](const crow::request& /*req*/) {
+        ([&sim](const crow::request& req) {
             crow::response res(nlohmann::json(sim.GetStatus()).dump());
             res.add_header("Content-Type", "application/json");
             return res;
@@ -153,7 +142,7 @@ int main(int argc, char* argv[]) {
 
     CROW_ROUTE(app, "/api/prices")
         .methods(crow::HTTPMethod::GET)
-        ([&sim](const crow::request& /*req*/) {
+        ([&sim](const crow::request& req) {
             crow::response res(nlohmann::json(sim.GetPrices()).dump());
             res.add_header("Content-Type", "application/json");
             return res;
@@ -197,7 +186,7 @@ int main(int argc, char* argv[]) {
 
     CROW_ROUTE(app, "/api/start")
         .methods(crow::HTTPMethod::POST)
-        ([&sim](const crow::request& /*req*/) {
+        ([&sim](const crow::request& req) {
             std::cout << "Received start request" << std::endl;
             sim.Start();
             
@@ -219,7 +208,7 @@ int main(int argc, char* argv[]) {
 
     CROW_ROUTE(app, "/api/stop")
         .methods(crow::HTTPMethod::POST)
-        ([&sim](const crow::request& /*req*/) {
+        ([&sim](const crow::request& req) {
             sim.Stop();
             
             // Broadcast status change
