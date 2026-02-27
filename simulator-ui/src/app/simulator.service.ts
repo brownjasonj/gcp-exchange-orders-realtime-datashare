@@ -86,7 +86,7 @@ export class SimulatorService {
     console.log(`Connecting to Shard ${index} at ${url}`);
 
     const socket = io(url, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket']
     });
     this.activeSockets.set(index, socket);
     this.setupSocketListeners(socket, index);

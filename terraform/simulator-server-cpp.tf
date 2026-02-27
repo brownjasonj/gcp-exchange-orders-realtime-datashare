@@ -125,10 +125,10 @@ resource "google_cloud_run_v2_service" "simulator_server_cpp" {
 }
 
 # Allow unauthenticated access
-resource "google_cloud_run_v2_service_iam_member" "simulator_server_cpp_public_access" {
+resource "google_cloud_run_service_iam_member" "simulator_server_cpp_public_access" {
   count    = var.simulator_implementation == "cpp" ? var.simulator_shards : 0
-  location = var.region
-  name     = google_cloud_run_v2_service.simulator_server_cpp[count.index].name
+  location = google_cloud_run_v2_service.simulator_server_cpp[count.index].location
+  service  = google_cloud_run_v2_service.simulator_server_cpp[count.index].name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
