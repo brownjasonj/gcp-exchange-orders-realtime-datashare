@@ -29,8 +29,6 @@ export class AppComponent implements OnInit {
   configError: string | null = null;
   fatalError: string | null = null;
 
-
-
   constructor(private simService: SimulatorService) {
     const env = (window as any).ENV || {};
     const apiUrls = env.API_URLS || (env.API_URL ? [env.API_URL] : []);
@@ -47,13 +45,9 @@ export class AppComponent implements OnInit {
   ngOnInit() {
     if (this.fatalError) return;
 
-
-
     this.simService.status$.subscribe(s => {
       this.status = s;
       if (s && s.config) {
-        // Only update text area if not focused? Or just on initial load?
-        // For simplicity, we only update if we haven't touched it, or if it's null
         if (!this.configJsonString) {
           this.configJsonString = JSON.stringify(s.config, null, 2);
         }
@@ -61,7 +55,6 @@ export class AppComponent implements OnInit {
     });
 
     this.simService.prices$.subscribe(p => {
-      // transform map to array for display
       this.prices = Object.entries(p).map(([k, v]) => ({ key: k, bid: v.bid, ask: v.ask }));
     });
 
@@ -82,13 +75,10 @@ export class AppComponent implements OnInit {
       })).sort((a, b) => a.shardIndex - b.shardIndex);
     });
 
-    // Also fetch config explicitly
     this.simService.getConfig().subscribe(c => {
       this.configJsonString = JSON.stringify(c, null, 2);
     });
   }
-
-
 
   flashStates: Record<string, { bid: boolean, ask: boolean }> = {};
 
@@ -99,7 +89,7 @@ export class AppComponent implements OnInit {
     this.flashStates[key][field] = true;
     setTimeout(() => {
       this.flashStates[key][field] = false;
-    }, 200); // 200ms flash
+    }, 200);
   }
 
   isFlashing(key: string, field: 'bid' | 'ask'): boolean {

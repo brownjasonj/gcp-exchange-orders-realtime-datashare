@@ -13,20 +13,38 @@ struct GlobalCORSMiddleware {
     struct context {};
 
     void before_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        // Just set the Vary header at the start
-        res.set_header("Vary", "Origin");
+        if (req.method == crow::HTTPMethod::Options) {
+            std::string origin = req.get_header_value("Origin");
+            if (origin.empty()) origin = req.get_header_value("origin");
+            if (origin.empty()) origin = "*";
+
+            res.code = 200;
+            res.set_header("Access-Control-Allow-Origin", origin);
+            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
+            res.set_header("Access-Control-Allow-Credentials", "true");
+            res.set_header("Access-Control-Max-Age", "3600");
+            res.set_header("Vary", "Origin");
+            res.body = "OK";
+            res.end();
+
+            std::cout << "Http Before Handle Origin: " << origin << std::endl;
+        }
     }
 
     void after_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
         std::string origin = req.get_header_value("Origin");
+        if (origin.empty()) origin = req.get_header_value("origin");
         if (origin.empty()) origin = "*";
         
-        // Ensure CORS headers are present on EVERY response
         res.set_header("Access-Control-Allow-Origin", origin);
         res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
         res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
         res.set_header("Access-Control-Allow-Credentials", "true");
         res.set_header("Access-Control-Max-Age", "3600");
+        res.set_header("Vary", "Origin");
+
+        std::cout << "Http After Handle Origin: " << origin << " status: " << res.code << std::endl;
     }
 };
 
@@ -72,25 +90,6 @@ int main(int argc, char* argv[]) {
         crow::App<GlobalCORSMiddleware> app; 
         app.loglevel(crow::LogLevel::Debug);
 
-        // Explicitly handle all OPTIONS requests globally as a fallback
-        CROW_CATCHALL_ROUTE(app)
-        ([&](const crow::request& req, crow::response& res) {
-            if (req.method == crow::HTTPMethod::Options) {
-                std::string origin = req.get_header_value("Origin");
-                if (origin.empty()) origin = "*";
-                res.code = 200;
-                res.set_header("Access-Control-Allow-Origin", origin);
-                res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-                res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
-                res.set_header("Access-Control-Allow-Credentials", "true");
-                res.body = "OK";
-                res.end();
-            } else {
-                res.code = 404;
-                res.body = "Not Found";
-                res.end();
-            }
-        });
 
         // WebSocket state
         static std::mutex connections_mutex;
@@ -140,7 +139,6 @@ int main(int argc, char* argv[]) {
 
         CROW_ROUTE(app, "/api/status").methods("GET"_method, "OPTIONS"_method)
         ([&sim](const crow::request& req) {
-            if (req.method == "OPTIONS"_method) return crow::response(200, "OK");
             return crow::response(nlohmann::json(sim.GetStatus()).dump());
         });
 
@@ -149,13 +147,11 @@ int main(int argc, char* argv[]) {
 
         CROW_ROUTE(app, "/api/prices").methods("GET"_method, "OPTIONS"_method)
         ([&sim](const crow::request& req) {
-            if (req.method == "OPTIONS"_method) return crow::response(200, "OK");
             return crow::response(nlohmann::json(sim.GetPrices()).dump());
         });
 
         CROW_ROUTE(app, "/api/config").methods("GET"_method, "POST"_method, "OPTIONS"_method)
         ([&sim](const crow::request& req) {
-            if (req.method == "OPTIONS"_method) return crow::response(200, "OK");
             if (req.method == "GET"_method) return crow::response(nlohmann::json(sim.GetStatus().config).dump());
             try {
                 auto body = nlohmann::json::parse(req.body);
@@ -168,14 +164,12 @@ int main(int argc, char* argv[]) {
 
         CROW_ROUTE(app, "/api/start").methods("POST"_method, "OPTIONS"_method)
         ([&sim](const crow::request& req) {
-            if (req.method == "OPTIONS"_method) return crow::response(200, "OK");
             sim.Start();
             return crow::response(200, "{\"success\": true}");
         });
 
         CROW_ROUTE(app, "/api/stop").methods("POST"_method, "OPTIONS"_method)
         ([&sim](const crow::request& req) {
-            if (req.method == "OPTIONS"_method) return crow::response(200, "OK");
             sim.Stop();
             return crow::response(200, "{\"success\": true}");
         });
