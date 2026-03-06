@@ -42,6 +42,15 @@ resource "null_resource" "build_sdk_base" {
   ]
 }
 
+data "google_project" "project" {}
+
+resource "google_artifact_registry_repository_iam_member" "cloudbuild_registry_reader" {
+  location   = google_artifact_registry_repository.simulator_cpp_repo.location
+  repository = google_artifact_registry_repository.simulator_cpp_repo.name
+  role       = "roles/artifactregistry.reader"
+  member     = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+}
+
 resource "null_resource" "build_and_push_image_cpp" {
   count = var.simulator_implementation == "cpp" ? 1 : 0
   triggers = {
@@ -58,6 +67,8 @@ resource "null_resource" "build_and_push_image_cpp" {
   }
 
   depends_on = [
+    null_resource.build_sdk_base,
+    google_artifact_registry_repository_iam_member.cloudbuild_registry_reader,
     google_artifact_registry_repository.simulator_cpp_repo,
     google_project_service.cloudbuild_api
   ]
