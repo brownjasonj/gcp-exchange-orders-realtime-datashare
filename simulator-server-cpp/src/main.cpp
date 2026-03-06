@@ -24,11 +24,26 @@ static simulator::Simulator* g_sim = nullptr;
 class SocketIOController : public WebSocketController<SocketIOController> {
 public:
     void handleNewMessage(const WebSocketConnectionPtr& conn, std::string&& message, const WebSocketMessageType& type) override {
-        // Handle Socket.IO heartbeat (2 -> 3)
+        std::cout << "[WS] Message from " << conn->peerAddr().toIpPort() << ": " << message << std::endl;
+        
+        // Handle Engine.IO ping (2) -> pong (3)
         if (message == "2") {
             conn->send("3");
-        } else if (message == "2probe") {
+        } 
+        // Handle Engine.IO probe (2probe) -> 3probe
+        else if (message == "2probe") {
             conn->send("3probe");
+        }
+        // Handle Socket.IO Connect to default namespace (40)
+        else if (message == "40" || message.substr(0, 2) == "40") {
+            // If the client sends 40, we respond with 40{"sid":"..."} 
+            // to acknowledge the connection to the default namespace.
+            // We use the same SID we would have generated in handleNewConnection
+            // or just generate a new one if not trackable easily.
+            // For now, let's just send back a connect packet.
+            std::string sid = "ws_" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count()).substr(8, 6);
+            conn->send("40{\"sid\":\"" + sid + "\"}");
+            std::cout << "[WS] Responded to client 40 with 40{\"sid\":\"" << sid << "\"}" << std::endl;
         }
     }
 
@@ -43,26 +58,30 @@ public:
         std::cout << "[WS] Client connected from " << conn->peerAddr().toIpPort() 
                   << " (Origin: " << (origin.empty() ? "null" : origin) << ")" << std::endl;
 
-        // Socket.IO / Engine.IO v4 Handshake (Open packet)
+        // Socket.IO / Engine.IO v4 Handshake
+        // Generate a standard-looking alphanumeric SID
+        std::string sid = "server_" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count()).substr(8, 6);
+        
         nlohmann::json handshake = {
-            {"sid", "sim-" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count())},
+            {"sid", sid},
             {"upgrades", nlohmann::json::array()},
             {"pingInterval", 25000},
             {"pingTimeout", 20000}
         };
         
-        // Use a small delay for "40" to ensure client is ready, but here we just send sequentially
-        // 0: Engine.IO Open
-        conn->send("0" + handshake.dump());
-        // 40: Socket.IO Connect to default namespace
-        conn->send("40");
+        // 1. Send Engine.IO Open packet
+        std::string open_packet = "0" + handshake.dump();
+        std::cout << "[WS] Sending Open: " << open_packet << std::endl;
+        conn->send(open_packet);
         
-        // Push initial state if simulator is ready
-        if (g_sim) {
-            std::cout << "[WS] Sending initial state to " << conn->peerAddr().toIpPort() << std::endl;
-            conn->send("42[\"status\"," + nlohmann::json(g_sim->GetStatus()).dump() + "]");
-            conn->send("42[\"prices\"," + nlohmann::json(g_sim->GetPrices()).dump() + "]");
-        }
+        // Note: We don't send '40' immediately here anymore. 
+        // We wait for the client to send '40' or we send it if the client stays quiet.
+        // Actually, many clients expect the server to send '40' for the default namespace immediately.
+        // Let's send it but without the '42' prefix (which is for events).
+        // 40{"sid":"..."} is the standard connect response.
+        conn->send("40{\"sid\":\"" + sid + "\"}");
+        
+        std::cout << "[WS] Initial Handshake + Connect sent to " << conn->peerAddr().toIpPort() << std::endl;
     }
 
     void handleConnectionClosed(const WebSocketConnectionPtr& conn) override {
