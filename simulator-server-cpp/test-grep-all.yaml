@@ -1,0 +1,4 @@
+steps:
+- name: 'us-central1-docker.pkg.dev/market-one-ip9muxsx/simulator-cpp-repo/simulator-cpp-sdk-base:latest'
+  entrypoint: 'grep'
+  args: ['-r', 'bigquery', '/usr/local/lib/cmake']

@@ -31,9 +31,10 @@ export class AppComponent implements OnInit {
 
   constructor(private simService: SimulatorService) {
     const env = (window as any).ENV || {};
-    const apiUrls = env.API_URLS || (env.API_URL ? [env.API_URL] : []);
+    let apiUrls = env.API_URLS || (env.API_URL ? [env.API_URL] : []);
     const projectId = env.PROJECT_ID;
 
+    // Removed localhost override to allow direct connection to Cloud Run via gcloud proxy
     if (apiUrls.length === 0 || !projectId) {
       this.fatalError = 'Missing Configuration: API_URLS and PROJECT_ID must be defined in environment.';
       console.error(this.fatalError);

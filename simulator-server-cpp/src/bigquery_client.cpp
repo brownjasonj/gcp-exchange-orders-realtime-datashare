@@ -50,8 +50,7 @@ bool BigQueryClient::StreamMessages(const std::vector<PricingMessage>& messages)
         std::cout << "[BigQuery] Opening stream to " << table_name_ << "..." << std::endl;
         
         // Create the bidirectional stream
-        auto stream_future = client_->AsyncAppendRows();
-        auto stream = stream_future.get();
+        auto stream = client_->AsyncAppendRows();
         
         if (!stream) {
             std::cerr << "[BigQuery] Error: Failed to create BigQuery stream" << std::endl;

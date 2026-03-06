@@ -4,7 +4,14 @@ FROM ${SDK_BASE} AS builder
 WORKDIR /app
 COPY . .
 
-# Use pre-installed SDK in /usr/local
+# Use pre-installed SDK in /usr/local and install additional dependencies for Drogon
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libjsoncpp-dev \
+    uuid-dev \
+    zlib1g-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN mkdir build && cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && \
     make -j$(nproc)
@@ -19,6 +26,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libboost-system1.74.0 \
     libboost-date-time1.74.0 \
     libboost-thread1.74.0 \
+    libjsoncpp25 \
+    libuuid1 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

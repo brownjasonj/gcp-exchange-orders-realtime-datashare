@@ -1,28 +1,26 @@
 # Simulator Access Guide
 
-## Why is direct access blocked?
-The Simulator UI and Server are deployed as **Private** Cloud Run services because your Organization Policy blocks public access. This prevents the browser from connecting directly to the cloud URLs.
+The Simulator UI and Server are deployed to Google Cloud Run and are accessible directly via their public URLs. No proxies, tunnels, or extra gcloud commands are needed.
 
-## How to Fix: Use Local Proxy
+## Quick Start
 
-To bypass the restrictions, you must run authentication proxies for **both** the Server and the UI locally.
+1. **Deploy**:
+   ```bash
+   # From the terraform directory
+   terraform apply -auto-approve
+   ```
 
-### 1. Start the Server Proxy (Terminal 1)
-This tunnels traffic from `localhost:3000` to the remote private server.
-```bash
-gcloud run services proxy simulator-server --region=us-central1 --port=3000
-```
-*Keep this terminal open.*
+2. **Access the URL**:
+   After the deployment completes, the URL of the UI will be displayed in the Terraform outputs as `simulator_ui_url`.
 
-### 2. Start the UI Proxy (Terminal 2)
-This tunnels traffic from `localhost:8080` to the remote private UI.
-```bash
-gcloud run services proxy simulator-ui --region=us-central1 --port=8080
-```
-*Keep this terminal open.*
+3. **Open in Browser**:
+   Copy and paste that URL into your browser. 
 
-### 3. Access the Simulator
-Open your browser to:
-[http://localhost:8080](http://localhost:8080)
+## How it Works
+The UI is configured via environment variables to connect directly to the backend shards in the cloud. It uses the `API_URLS` shard list to communicate with each simulator server directly. CORS headers are already implemented in the C++ backend to allow this direct cross-origin communication.
 
-The UI will detect it is running on localhost and automatically connect to the Server at `http://localhost:3000`, bypassing CORS and Authentication errors.
+## Troubleshooting
+If you experience connectivity issues:
+* Ensure you are logged into GCP in your browser (if the services require authentication).
+* Check the browser console (F12) for any blocking errors.
+* Re-verify that the `API_URLS` in the UI logs match the real shard URLs.

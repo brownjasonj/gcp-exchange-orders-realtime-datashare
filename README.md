@@ -84,20 +84,15 @@ pubsub_topic     = <NAME_OF_PUBSUB_TOPIC_TO_BE_CREATED>
 region           = <REGION_FOR_REPLOYMENT>
 ```
 
-#### 4. Deploy 
+#### 4. Deploy and Access
 ```bash
-gcloud auth login
-gcloud config set project <YOUR_PROJECT_ID>
-gcloud auth application-default login
 terraform init
 terraform apply -auto-approve
 ```
 
-### 5. Start the UI Proxy 
-This tunnels traffic from `localhost:8080` to the remote private UI.
-```bash
-gcloud run services proxy simulator-ui --region=<REGION_FOR_REPLOYMENT> --port=8080
-```
+Once deployment is complete, look for the **`simulator_ui_url`** in the Terraform outputs. Copy that URL into your browser to access the Simulator directly. No proxies or extra gcloud commands are required.
+
+For more details on connectivity, see [SIMULATOR_ACCESS.md](SIMULATOR_ACCESS.md).
 
 Below is a screenshot of the simulator ui
 

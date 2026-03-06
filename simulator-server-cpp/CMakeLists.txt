@@ -9,15 +9,18 @@ include(FetchContent)
 # Nlohmann JSON
 find_package(nlohmann_json REQUIRED)
 
-# Crow REST Framework
+# Drogon REST Framework (using git to ensure submodules like trantor are pulled)
 FetchContent_Declare(
-    crow
-    URL https://github.com/CrowCpp/Crow/archive/refs/tags/v1.2.0.tar.gz
+    drogon
+    GIT_REPOSITORY https://github.com/drogonframework/drogon
+    GIT_TAG v1.9.0
 )
-FetchContent_MakeAvailable(crow)
+FetchContent_MakeAvailable(drogon)
+
+
 
 # Google Cloud CPP - Found in the system (pre-installed in base image)
-# Note: In v2, bigquery_storage is part of the bigquery package
+# Note: In this SDK version, bigquery_storage is bundled in the bigquery package
 find_package(google_cloud_cpp_bigquery REQUIRED)
 
 # Find Protobuf and gRPC
@@ -39,7 +42,7 @@ add_executable(simulator-server-cpp
 target_link_libraries(simulator-server-cpp
     PRIVATE
     nlohmann_json::nlohmann_json
-    Crow::Crow
+    drogon
     google-cloud-cpp::bigquery
     protobuf::libprotobuf
     gRPC::grpc++

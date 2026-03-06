@@ -5,59 +5,81 @@
 #include <mutex>
 #include "types.hpp"
 #include <nlohmann/json.hpp>
-#include <crow.h>
+#include <drogon/drogon.h>
+#include <drogon/WebSocketController.h>
+#include <drogon/HttpAppFramework.h>
 
 using json = nlohmann::json;
+using namespace drogon;
 
-struct GlobalCORSMiddleware {
-    struct context {};
+// Global state for WebSocket logic
+static std::mutex g_connections_mutex;
+static std::set<WebSocketConnectionPtr> g_connections;
+static simulator::Simulator* g_sim = nullptr;
 
-    void before_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        if (req.method == crow::HTTPMethod::Options) {
-            std::string origin = req.get_header_value("Origin");
-            if (origin.empty()) origin = req.get_header_value("origin");
-            if (origin.empty()) origin = "*";
-
-            res.code = 200;
-            res.set_header("Access-Control-Allow-Origin", origin);
-            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-            res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
-            res.set_header("Access-Control-Allow-Credentials", "true");
-            res.set_header("Access-Control-Max-Age", "3600");
-            res.set_header("Vary", "Origin");
-            res.body = "OK";
-            res.end();
-
-            std::cout << "Http Before Handle Origin: " << origin << std::endl;
+/**
+ * WebSocket Controller for Socket.IO emulation.
+ * Drogon handles WebSocket upgrades and message routing via this class.
+ */
+class SocketIOController : public WebSocketController<SocketIOController> {
+public:
+    void handleNewMessage(const WebSocketConnectionPtr& conn, std::string&& message, const WebSocketMessageType& type) override {
+        // Handle Socket.IO heartbeat (2 -> 3)
+        if (message == "2") {
+            conn->send("3");
         }
     }
 
-    void after_handle(crow::request& req, crow::response& res, context& /*ctx*/) {
-        std::string origin = req.get_header_value("Origin");
-        if (origin.empty()) origin = req.get_header_value("origin");
-        if (origin.empty()) origin = "*";
+    void handleNewConnection(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn) override {
+        {
+            std::lock_guard<std::mutex> lock(g_connections_mutex);
+            g_connections.insert(conn);
+        }
         
-        res.set_header("Access-Control-Allow-Origin", origin);
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
-        res.set_header("Access-Control-Allow-Credentials", "true");
-        res.set_header("Access-Control-Max-Age", "3600");
-        res.set_header("Vary", "Origin");
+        std::cout << "[WS] Client Connected from " << conn->peerAddr().toIpPort() << std::endl;
 
-        std::cout << "Http After Handle Origin: " << origin << " status: " << res.code << std::endl;
+        // Socket.IO v4 Handshake
+        nlohmann::json handshake = {
+            {"sid", "simulator-cpp-session"},
+            {"upgrades", nlohmann::json::array()},
+            {"pingInterval", 25000},
+            {"pingTimeout", 5000}
+        };
+        
+        // 0: Engine.IO Open packet
+        conn->send("0" + handshake.dump());
+        // 40: Socket.IO Connect packet to default namespace
+        conn->send("40");
+        
+        // Push initial state if simulator is ready
+        if (g_sim) {
+            conn->send("42[\"status\"," + nlohmann::json(g_sim->GetStatus()).dump() + "]");
+            conn->send("42[\"prices\"," + nlohmann::json(g_sim->GetPrices()).dump() + "]");
+        }
     }
+
+    void handleConnectionClosed(const WebSocketConnectionPtr& conn) override {
+        {
+            std::lock_guard<std::mutex> lock(g_connections_mutex);
+            g_connections.erase(conn);
+        }
+        std::cout << "[WS] Client Disconnected" << std::endl;
+    }
+
+    WS_PATH_LIST_BEGIN
+    WS_PATH_ADD("/socket.io/");
+    WS_PATH_LIST_END
 };
 
-
 int main(int argc, char* argv[]) {
-    // Disable stdout buffering for immediate Cloud Run logs
+    // Disable stdout buffering for immediate feedback in Cloud Run logs
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 
     try {
-        std::cout << "Starting boot sequence..." << std::endl;
+        std::cout << "Starting C++ Simulator Server (Drogon)..." << std::endl;
         
-        // Load config
+        // --- 1. Load Configuration ---
         std::string config_path = "config.json";
         if (argc > 1) config_path = argv[1];
 
@@ -71,6 +93,9 @@ int main(int argc, char* argv[]) {
             config_json["symbols"] = {"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"};
             config_json["currencies"] = {"USD", "EUR"};
             config_json["venues"] = {"NASDAQ", "NYSE"};
+            config_json["periodicityMs"] = 1000;
+            config_json["priceVariationPercentage"] = 0.5;
+            config_json["gcpProjectId"] = "google.com:cl-data-cloud-field-ops";
         }
 
         simulator::Config config = config_json.get<simulator::Config>();
@@ -80,105 +105,145 @@ int main(int argc, char* argv[]) {
         if (const char* ds_id = std::getenv("BIGQUERY_DATASET_ID")) config.bigquery_dataset_id = ds_id;
         if (const char* tb_id = std::getenv("BIGQUERY_TABLE_ID")) config.bigquery_table_id = tb_id;
         
-        // Default values if still empty
+        // Default values for common GCP project structure if still empty
         if (config.bigquery_dataset_id.empty()) config.bigquery_dataset_id = "paywall_datasets";
         if (config.bigquery_table_id.empty()) config.bigquery_table_id = "bidask_all_staged";
 
+        // --- 2. Initialize Simulator ---
         std::cout << "Initializing Simulator for project " << config.gcp_project_id << "..." << std::endl;
         simulator::Simulator sim(config);
+        g_sim = &sim;
 
-        crow::App<GlobalCORSMiddleware> app; 
-        app.loglevel(crow::LogLevel::Debug);
-
-
-        // WebSocket state
-        static std::mutex connections_mutex;
-        static std::set<crow::websocket::connection*> connections;
-
+        // Set up simulator callbacks for real-time WebSocket updates
         sim.SetCallbacks(
             [](const simulator::PricingMessage& msg) {
-                std::lock_guard<std::mutex> lock(connections_mutex);
+                std::lock_guard<std::mutex> lock(g_connections_mutex);
                 std::string payload = "42[\"message\"," + nlohmann::json(msg).dump() + "]";
-                for (auto conn : connections) {
-                    try { conn->send_text(payload); } catch (...) {}
+                for (auto it = g_connections.begin(); it != g_connections.end(); ++it) {
+                    (*it)->send(payload);
                 }
             },
             [](const simulator::PriceUpdate& pu) {
-                std::lock_guard<std::mutex> lock(connections_mutex);
+                std::lock_guard<std::mutex> lock(g_connections_mutex);
                 std::string payload = "42[\"priceUpdate\"," + nlohmann::json(pu).dump() + "]";
-                for (auto conn : connections) {
-                    try { conn->send_text(payload); } catch (...) {}
+                for (auto it = g_connections.begin(); it != g_connections.end(); ++it) {
+                    (*it)->send(payload);
                 }
             },
             [](const simulator::BurstProgress& prog) {
-                std::lock_guard<std::mutex> lock(connections_mutex);
+                std::lock_guard<std::mutex> lock(g_connections_mutex);
                 std::string payload = "42[\"burstProgress\"," + nlohmann::json(prog).dump() + "]";
-                for (auto conn : connections) {
-                    try { conn->send_text(payload); } catch (...) {}
+                for (auto it = g_connections.begin(); it != g_connections.end(); ++it) {
+                    (*it)->send(payload);
                 }
             }
         );
 
-        CROW_WEBSOCKET_ROUTE(app, "/socket.io/")
-            .onopen([&sim](crow::websocket::connection& conn) {
-                std::lock_guard<std::mutex> lock(connections_mutex);
-                connections.insert(&conn);
-                json handshake = {{"sid", "simulator-cpp-session"},{"upgrades", json::array()},{"pingInterval", 25000},{"pingTimeout", 5000}};
-                conn.send_text("0" + handshake.dump());
-                conn.send_text("40");
-                conn.send_text("42[\"status\"," + nlohmann::json(sim.GetStatus()).dump() + "]");
-                conn.send_text("42[\"prices\"," + nlohmann::json(sim.GetPrices()).dump() + "]");
-            })
-            .onclose([](crow::websocket::connection& conn, const std::string&) {
-                std::lock_guard<std::mutex> lock(connections_mutex);
-                connections.erase(&conn);
-            })
-            .onmessage([](crow::websocket::connection& conn, const std::string& data, bool) {
-                if (data == "2") conn.send_text("3");
-            });
-
-        CROW_ROUTE(app, "/api/status").methods("GET"_method, "OPTIONS"_method)
-        ([&sim](const crow::request& req) {
-            return crow::response(nlohmann::json(sim.GetStatus()).dump());
-        });
-
-        CROW_ROUTE(app, "/").methods("GET"_method)([]() { return "OK"; });
-        CROW_ROUTE(app, "/healthz").methods("GET"_method)([]() { return "OK"; });
-
-        CROW_ROUTE(app, "/api/prices").methods("GET"_method, "OPTIONS"_method)
-        ([&sim](const crow::request& req) {
-            return crow::response(nlohmann::json(sim.GetPrices()).dump());
-        });
-
-        CROW_ROUTE(app, "/api/config").methods("GET"_method, "POST"_method, "OPTIONS"_method)
-        ([&sim](const crow::request& req) {
-            if (req.method == "GET"_method) return crow::response(nlohmann::json(sim.GetStatus().config).dump());
-            try {
-                auto body = nlohmann::json::parse(req.body);
-                sim.UpdateConfig(body.get<simulator::Config>());
-                return crow::response(200, "{\"success\": true}");
-            } catch (const std::exception& e) {
-                return crow::response(400, "{\"error\": \"" + std::string(e.what()) + "\"}");
+        // --- 3. Drogon Configuration (Global Middlewares) ---
+        
+        // CORS Handling via Pre-Routing Advice
+        app().registerPreRoutingAdvice([](const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&cb, std::function<void()> &&chain) {
+            if (req->method() == Options) {
+                auto resp = HttpResponse::newHttpResponse();
+                std::string origin = req->getHeader("Origin");
+                if (origin.empty()) origin = req->getHeader("origin");
+                if (origin.empty()) origin = "*";
+                
+                resp->addHeader("Access-Control-Allow-Origin", origin);
+                resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+                resp->addHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
+                resp->addHeader("Access-Control-Allow-Credentials", "true");
+                resp->addHeader("Access-Control-Max-Age", "3600");
+                resp->addHeader("Vary", "Origin");
+                resp->setStatusCode(k200OK);
+                resp->setBody("OK"); // Non-empty body for Cloud Run protocol safety
+                cb(resp);
+            } else {
+                chain();
             }
         });
 
-        CROW_ROUTE(app, "/api/start").methods("POST"_method, "OPTIONS"_method)
-        ([&sim](const crow::request& req) {
-            sim.Start();
-            return crow::response(200, "{\"success\": true}");
+        // Post-Handling Advice to add CORS headers to all successful responses
+        app().registerPostHandlingAdvice([](const HttpRequestPtr &req, const HttpResponsePtr &resp) {
+            std::string origin = req->getHeader("Origin");
+            if (origin.empty()) origin = req->getHeader("origin");
+            if (origin.empty()) origin = "*";
+            
+            if (resp->getHeader("Access-Control-Allow-Origin").empty()) {
+                resp->addHeader("Access-Control-Allow-Origin", origin);
+                resp->addHeader("Access-Control-Allow-Credentials", "true");
+                resp->addHeader("Vary", "Origin");
+            }
         });
 
-        CROW_ROUTE(app, "/api/stop").methods("POST"_method, "OPTIONS"_method)
-        ([&sim](const crow::request& req) {
-            sim.Stop();
-            return crow::response(200, "{\"success\": true}");
-        });
+        // --- 4. API Handlers ---
 
+        app().registerHandler("/api/status", [](const HttpRequestPtr&, std::function<void(const HttpResponsePtr&)>&& callback) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setContentTypeCode(CT_APPLICATION_JSON);
+            if (g_sim) resp->setBody(nlohmann::json(g_sim->GetStatus()).dump());
+            callback(resp);
+        }, {drogon::Get});
+
+        app().registerHandler("/api/prices", [](const HttpRequestPtr&, std::function<void(const HttpResponsePtr&)>&& callback) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setContentTypeCode(CT_APPLICATION_JSON);
+            if (g_sim) resp->setBody(nlohmann::json(g_sim->GetPrices()).dump());
+            callback(resp);
+        }, {drogon::Get});
+
+        app().registerHandler("/api/config", [](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setContentTypeCode(CT_APPLICATION_JSON);
+            
+            if (req->method() == drogon::Get) {
+                if (g_sim) resp->setBody(nlohmann::json(g_sim->GetStatus().config).dump());
+            } else if (req->method() == drogon::Post) {
+                try {
+                    auto body = nlohmann::json::parse(req->body());
+                    if (g_sim) g_sim->UpdateConfig(body.get<simulator::Config>());
+                    resp->setBody("{\"success\": true}");
+                } catch (const std::exception& e) {
+                    resp->setStatusCode(k400BadRequest);
+                    resp->setBody("{\"error\": \"" + std::string(e.what()) + "\"}");
+                }
+            }
+            callback(resp);
+        }, {drogon::Get, drogon::Post});
+
+        app().registerHandler("/api/start", [](const HttpRequestPtr&, std::function<void(const HttpResponsePtr&)>&& callback) {
+            if (g_sim) g_sim->Start();
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setContentTypeCode(CT_APPLICATION_JSON);
+            resp->setBody("{\"success\": true}");
+            callback(resp);
+        }, {drogon::Post});
+
+        app().registerHandler("/api/stop", [](const HttpRequestPtr&, std::function<void(const HttpResponsePtr&)>&& callback) {
+            if (g_sim) g_sim->Stop();
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setContentTypeCode(CT_APPLICATION_JSON);
+            resp->setBody("{\"success\": true}");
+            callback(resp);
+        }, {drogon::Post});
+
+        // Health Checks
+        auto health_handler = [](const HttpRequestPtr&, std::function<void(const HttpResponsePtr&)>&& callback) {
+            auto resp = HttpResponse::newHttpResponse();
+            resp->setBody("OK");
+            callback(resp);
+        };
+        app().registerHandler("/", health_handler, {drogon::Get});
+        app().registerHandler("/healthz", health_handler, {drogon::Get});
+
+        // --- 5. Run Framework ---
         const char* port_env = std::getenv("PORT");
         uint16_t port = port_env ? static_cast<uint16_t>(std::stoi(port_env)) : 8080;
 
-        std::cout << "Starting C++ Simulator Server on [::]:" << port << "..." << std::endl;
-        app.bindaddr("::").port(port).multithreaded().run();
+        std::cout << "Starting C++ Simulator Server (Drogon) on 0.0.0.0:" << port << "..." << std::endl;
+        app().addListener("0.0.0.0", port)
+             .setThreadNum(0) // Automatic based on cores
+             .run();
 
     } catch (const std::exception& e) {
         std::cerr << "FATAL ERROR during startup: " << e.what() << std::endl;
@@ -190,6 +255,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
-
-

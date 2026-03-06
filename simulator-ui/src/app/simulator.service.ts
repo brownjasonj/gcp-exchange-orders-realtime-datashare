@@ -86,7 +86,8 @@ export class SimulatorService {
     console.log(`Connecting to Shard ${index} at ${url}`);
 
     const socket = io(url, {
-      transports: ['websocket']
+      transports: ['websocket'],
+      withCredentials: true
     });
     this.activeSockets.set(index, socket);
     this.setupSocketListeners(socket, index);
@@ -207,18 +208,18 @@ export class SimulatorService {
   // Get config from the first shard (assuming consistent config)
   getConfig(): Observable<Config> {
     if (this.apiUrls.length === 0) return of({} as Config);
-    return this.http.get<Config>(`${this.apiUrls[0]}/api/config`);
+    return this.http.get<Config>(`${this.apiUrls[0]}/api/config`, { withCredentials: true });
   }
 
   updateConfig(config: Config): Observable<any[]> {
     this.burstProgress$.next(new Map());
-    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/config`, config));
+    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/config`, config, { withCredentials: true }));
     return forkJoin(reqs);
   }
 
   start(): Observable<any[]> {
     this.burstProgress$.next(new Map());
-    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/start`, {}));
+    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/start`, {}, { withCredentials: true }));
     return forkJoin(reqs).pipe(
       map(res => {
         const current = this.status$.value;
@@ -231,7 +232,7 @@ export class SimulatorService {
   }
 
   stop(): Observable<any[]> {
-    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/stop`, {}));
+    const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/stop`, {}, { withCredentials: true }));
     return forkJoin(reqs).pipe(
       map(res => {
         const current = this.status$.value;
