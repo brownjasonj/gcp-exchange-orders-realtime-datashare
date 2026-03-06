@@ -59,13 +59,14 @@ export class SimulatorService {
   initialize(apiUrls: string[], projectId: string) {
     this.apiUrls = apiUrls;
     this.projectId = projectId;
-    console.log(`Initializing SimulatorService with ${this.apiUrls.length} API_URLS, PROJECT_ID: ${this.projectId}`);
+    console.log(`[DEBUG] Initializing SimulatorService with ${this.apiUrls.length} API_URLS, PROJECT_ID: ${this.projectId}`);
+    console.log(`[DEBUG] API URLs:`, this.apiUrls);
 
     // Reset progress map
     this.burstProgress$.next(new Map());
 
     // Connect to all shards by default
-    this.apiUrls.forEach((_, index) => {
+    this.apiUrls.forEach((url, index) => {
       this.connectShard(index);
     });
   }
@@ -83,12 +84,18 @@ export class SimulatorService {
     if (index < 0 || index >= this.apiUrls.length) return;
 
     const url = this.apiUrls[index];
-    console.log(`Connecting to Shard ${index} at ${url}`);
+    console.log(`[DEBUG] Attempting to connect to Shard ${index} at ${url}`);
 
-    const socket = io(url, {
+    // Use a clean URL without trailing slash for Socket.IO if possible
+    const cleanUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+
+    const socket = io(cleanUrl, {
       transports: ['websocket'],
-      withCredentials: true
+      withCredentials: true,
+      reconnectionAttempts: 5,
+      timeout: 10000
     });
+
     this.activeSockets.set(index, socket);
     this.setupSocketListeners(socket, index);
   }
@@ -96,19 +103,14 @@ export class SimulatorService {
   disconnectShard(index: number) {
     const socket = this.activeSockets.get(index);
     if (socket) {
-      console.log(`Disconnecting form Shard ${index}`);
+      console.log(`[DEBUG] Disconnecting from Shard ${index}`);
       socket.disconnect();
       this.activeSockets.delete(index);
-
-      // Clear data associated with this shard? 
-      // For now, we keep the prices in the view until cleared or overwritten, 
-      // but maybe we should clear to avoid confusion.
-      // Ideally we'd remove keys belonging to this shard, but we don't track which key came from which shard easily.
-      // Let's just leave it, assuming user is switching views.
     }
   }
 
   disconnectAll() {
+    console.log('[DEBUG] Disconnecting all shards');
     this.activeSockets.forEach(s => s.disconnect());
     this.activeSockets.clear();
     this.prices$.next({});
@@ -118,26 +120,36 @@ export class SimulatorService {
 
   private setupSocketListeners(socket: Socket, index: number) {
     socket.on('connect', () => {
-      console.log(`Connected to Simulator Backend Shard ${index}`);
+      console.log(`[DEBUG] [Shard ${index}] Connected to WebSocket`);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error(`[DEBUG] [Shard ${index}] Connection Error:`, err.message, err);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.warn(`[DEBUG] [Shard ${index}] Disconnected:`, reason);
+    });
+
+    socket.on('reconnect_attempt', (num) => {
+      console.log(`[DEBUG] [Shard ${index}] Reconnect attempt ${num}`);
     });
 
     socket.on('status', (status) => {
+      console.log(`[DEBUG] [Shard ${index}] Received status:`, status);
       // Just update status from any shard. They should be effectively sync'd by UI actions.
       this.status$.next(status);
     });
 
     socket.on('prices', (prices: Record<string, number>) => {
+      console.log(`[DEBUG] [Shard ${index}] Received initial prices:`, Object.keys(prices).length, "symbols");
       const current = this.prices$.value;
       const merged = { ...current };
-      
-      // Merge new keys. 
-      // Assumption: Shards have distinct symbols, so collisions are rare or don't matter (last win).
+
       Object.entries(prices).forEach(([key, price]) => {
         if (!merged[key]) {
-          merged[key] = { bid: price, ask: price }; // Initialize with base price
+          merged[key] = { bid: price, ask: price };
         } else {
-          // Optional: Update existing if we want to sync baseline, but protecting existing bid/ask spread is probably better
-          // changing this to only fill gaps
           if (merged[key].bid === undefined) merged[key].bid = price;
           if (merged[key].ask === undefined) merged[key].ask = price;
         }
@@ -204,41 +216,39 @@ export class SimulatorService {
   }
 
   // API Methods
-  
-  // Get config from the first shard (assuming consistent config)
+
   getConfig(): Observable<Config> {
     if (this.apiUrls.length === 0) return of({} as Config);
     return this.http.get<Config>(`${this.apiUrls[0]}/api/config`, { withCredentials: true });
   }
 
   updateConfig(config: Config): Observable<any[]> {
+    console.log('[DEBUG] Updating configuration on all shards');
     this.burstProgress$.next(new Map());
     const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/config`, config, { withCredentials: true }));
     return forkJoin(reqs);
   }
 
   start(): Observable<any[]> {
+    console.log('[DEBUG] Starting simulation on all shards');
     this.burstProgress$.next(new Map());
     const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/start`, {}, { withCredentials: true }));
     return forkJoin(reqs).pipe(
       map(res => {
-        const current = this.status$.value;
-        if (current) {
-          this.status$.next({ ...current, isRunning: true });
-        }
+        const current = this.status$.value || { isRunning: false, config: {} };
+        this.status$.next({ ...current, isRunning: true });
         return res;
       })
     );
   }
 
   stop(): Observable<any[]> {
+    console.log('[DEBUG] Stopping simulation on all shards');
     const reqs = this.apiUrls.map(url => this.http.post(`${url}/api/stop`, {}, { withCredentials: true }));
     return forkJoin(reqs).pipe(
       map(res => {
-        const current = this.status$.value;
-        if (current) {
-          this.status$.next({ ...current, isRunning: false });
-        }
+        const current = this.status$.value || { isRunning: true, config: {} };
+        this.status$.next({ ...current, isRunning: false });
         return res;
       })
     );

@@ -119,10 +119,24 @@ export class AppComponent implements OnInit {
   }
 
   toggleSimulation() {
+    if (this.fatalError) return;
+
     if (this.isRunning) {
-      this.simService.stop().subscribe();
+      this.simService.stop().subscribe({
+        next: () => console.log('[DEBUG] Simulation stopped successfully'),
+        error: (err) => {
+          console.error('[DEBUG] Failed to stop simulation:', err);
+          alert('Failed to stop: ' + (err.message || 'Unknown error'));
+        }
+      });
     } else {
-      this.simService.start().subscribe();
+      this.simService.start().subscribe({
+        next: () => console.log('[DEBUG] Simulation started successfully'),
+        error: (err) => {
+          console.error('[DEBUG] Failed to start simulation:', err);
+          alert('Failed to start: ' + (err.message || 'Unknown error'));
+        }
+      });
     }
   }
 
@@ -131,8 +145,14 @@ export class AppComponent implements OnInit {
       this.configError = null;
       const config = JSON.parse(this.configJsonString);
       this.simService.updateConfig(config).subscribe({
-        next: () => alert('Configuration Saved & Simulation Reset'),
-        error: (err) => alert('Failed to save: ' + err.message)
+        next: () => {
+          console.log('[DEBUG] Configuration saved successfully');
+          alert('Configuration Saved & Simulation Reset');
+        },
+        error: (err) => {
+          console.error('[DEBUG] Failed to save configuration:', err);
+          alert('Failed to save: ' + (err.message || 'Unknown error'));
+        }
       });
     } catch (e) {
       this.configError = (e as Error).message;

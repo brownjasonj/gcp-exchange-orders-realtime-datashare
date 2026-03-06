@@ -27,32 +27,39 @@ public:
         // Handle Socket.IO heartbeat (2 -> 3)
         if (message == "2") {
             conn->send("3");
+        } else if (message == "2probe") {
+            conn->send("3probe");
         }
     }
 
     void handleNewConnection(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn) override {
+        const std::string& origin = req->getHeader("Origin").empty() ? req->getHeader("origin") : req->getHeader("Origin");
+        
         {
             std::lock_guard<std::mutex> lock(g_connections_mutex);
             g_connections.insert(conn);
         }
         
-        std::cout << "[WS] Client Connected from " << conn->peerAddr().toIpPort() << std::endl;
+        std::cout << "[WS] Client connected from " << conn->peerAddr().toIpPort() 
+                  << " (Origin: " << (origin.empty() ? "null" : origin) << ")" << std::endl;
 
-        // Socket.IO v4 Handshake
+        // Socket.IO / Engine.IO v4 Handshake (Open packet)
         nlohmann::json handshake = {
-            {"sid", "simulator-cpp-session"},
+            {"sid", "sim-" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count())},
             {"upgrades", nlohmann::json::array()},
             {"pingInterval", 25000},
-            {"pingTimeout", 5000}
+            {"pingTimeout", 20000}
         };
         
-        // 0: Engine.IO Open packet
+        // Use a small delay for "40" to ensure client is ready, but here we just send sequentially
+        // 0: Engine.IO Open
         conn->send("0" + handshake.dump());
-        // 40: Socket.IO Connect packet to default namespace
+        // 40: Socket.IO Connect to default namespace
         conn->send("40");
         
         // Push initial state if simulator is ready
         if (g_sim) {
+            std::cout << "[WS] Sending initial state to " << conn->peerAddr().toIpPort() << std::endl;
             conn->send("42[\"status\"," + nlohmann::json(g_sim->GetStatus()).dump() + "]");
             conn->send("42[\"prices\"," + nlohmann::json(g_sim->GetPrices()).dump() + "]");
         }
@@ -63,11 +70,12 @@ public:
             std::lock_guard<std::mutex> lock(g_connections_mutex);
             g_connections.erase(conn);
         }
-        std::cout << "[WS] Client Disconnected" << std::endl;
+        std::cout << "[WS] Client disconnected" << std::endl;
     }
 
     WS_PATH_LIST_BEGIN
     WS_PATH_ADD("/socket.io/");
+    WS_PATH_ADD("/socket.io");
     WS_PATH_LIST_END
 };
 
@@ -141,8 +149,11 @@ int main(int argc, char* argv[]) {
 
         // --- 3. Drogon Configuration (Global Middlewares) ---
         
-        // CORS Handling via Pre-Routing Advice
+        // Log all incoming requests for debugging
         app().registerPreRoutingAdvice([](const HttpRequestPtr &req, std::function<void(const HttpResponsePtr &)> &&cb, std::function<void()> &&chain) {
+            std::cout << "[HTTP] " << req->methodString() << " " << req->path() 
+                      << " from " << req->peerAddr().toIpPort() << std::endl;
+
             if (req->method() == Options) {
                 auto resp = HttpResponse::newHttpResponse();
                 std::string origin = req->getHeader("Origin");
@@ -156,23 +167,24 @@ int main(int argc, char* argv[]) {
                 resp->addHeader("Access-Control-Max-Age", "3600");
                 resp->addHeader("Vary", "Origin");
                 resp->setStatusCode(k200OK);
-                resp->setBody("OK"); // Non-empty body for Cloud Run protocol safety
+                resp->setBody("OK"); 
                 cb(resp);
             } else {
                 chain();
             }
         });
 
-        // Post-Handling Advice to add CORS headers to all successful responses
+        // Post-Handling Advice to add CORS headers to all responses
         app().registerPostHandlingAdvice([](const HttpRequestPtr &req, const HttpResponsePtr &resp) {
             std::string origin = req->getHeader("Origin");
             if (origin.empty()) origin = req->getHeader("origin");
-            if (origin.empty()) origin = "*";
             
-            if (resp->getHeader("Access-Control-Allow-Origin").empty()) {
+            if (!origin.empty()) {
                 resp->addHeader("Access-Control-Allow-Origin", origin);
                 resp->addHeader("Access-Control-Allow-Credentials", "true");
                 resp->addHeader("Vary", "Origin");
+            } else {
+                resp->addHeader("Access-Control-Allow-Origin", "*");
             }
         });
 
@@ -212,6 +224,7 @@ int main(int argc, char* argv[]) {
         }, {drogon::Get, drogon::Post});
 
         app().registerHandler("/api/start", [](const HttpRequestPtr&, std::function<void(const HttpResponsePtr&)>&& callback) {
+            std::cout << "[API] Starting Simulator..." << std::endl;
             if (g_sim) g_sim->Start();
             auto resp = HttpResponse::newHttpResponse();
             resp->setContentTypeCode(CT_APPLICATION_JSON);
@@ -220,6 +233,7 @@ int main(int argc, char* argv[]) {
         }, {drogon::Post});
 
         app().registerHandler("/api/stop", [](const HttpRequestPtr&, std::function<void(const HttpResponsePtr&)>&& callback) {
+            std::cout << "[API] Stopping Simulator..." << std::endl;
             if (g_sim) g_sim->Stop();
             auto resp = HttpResponse::newHttpResponse();
             resp->setContentTypeCode(CT_APPLICATION_JSON);
@@ -255,3 +269,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
