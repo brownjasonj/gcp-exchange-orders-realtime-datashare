@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package simulator;
+
+message PricingMessageProto {
+    string symbol = 1;
+    int64 sequenceNumber = 2;
+    double price = 3;
+    string currency = 4;
+    string venue = 5;
+    string timestamp = 6;
+    string bidAsk = 7;
+    int64 quantity = 8;
+}

@@ -1,0 +1,4 @@
+steps:
+- name: 'us-central1-docker.pkg.dev/market-one-ip9muxsx/simulator-cpp-repo/simulator-cpp-sdk-base:latest'
+  entrypoint: 'find'
+  args: ['/usr/local/lib', '-name', '*storage*.a']
