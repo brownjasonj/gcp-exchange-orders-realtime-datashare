@@ -42,8 +42,16 @@ bool BigQueryClient::StreamMessages(const std::vector<PricingMessage>& messages)
         proto_msg.set_timestamp(msg.timestamp);
         proto_msg.set_bidask(msg.bid_ask);
         proto_msg.set_quantity(msg.quantity);
+        proto_msg.set_publishtime(msg.publish_time);
         
         proto_rows->mutable_rows()->add_serialized_rows(proto_msg.SerializeAsString());
+    }
+
+    // Use a unique trace_id for deduplication based on sequence numbers and current time to prevent collisions
+    if (!messages.empty()) {
+        auto now_ns = std::chrono::system_clock::now().time_since_epoch().count();
+        std::string trace_id = "batch-" + std::to_string(messages.front().sequence_number) + "-" + std::to_string(now_ns);
+        request.set_trace_id(trace_id);
     }
     
     try {

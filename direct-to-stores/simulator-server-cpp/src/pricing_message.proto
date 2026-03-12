@@ -11,4 +11,5 @@ message PricingMessageProto {
     string timestamp = 6;
     string bidAsk = 7;
     int64 quantity = 8;
+    string publishTime = 9;
 }

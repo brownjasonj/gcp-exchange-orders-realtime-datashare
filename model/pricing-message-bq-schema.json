@@ -48,6 +48,12 @@
     "description": "The quantity available at this price"
   },
   {
+    "name": "publishTime",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "The time when the message was published to BigQuery"
+  },
+  {
     "name": "ingestion_time",
     "type": "TIMESTAMP",
     "mode": "NULLABLE",

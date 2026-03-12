@@ -149,6 +149,16 @@ void Simulator::HandleBurst() {
         std::vector<PricingMessage> batch;
         batch.assign(all_messages.begin() + i, all_messages.begin() + end);
         
+        auto now_pub = std::chrono::system_clock::now();
+        auto in_time_t_pub = std::chrono::system_clock::to_time_t(now_pub);
+        std::stringstream ss_pub;
+        ss_pub << std::put_time(std::gmtime(&in_time_t_pub), "%Y-%m-%dT%H:%M:%SZ");
+        std::string publish_time = ss_pub.str();
+
+        for (auto& msg : batch) {
+            msg.publish_time = publish_time;
+        }
+        
         bq_client_->StreamMessages(batch);
         total_published += batch.size();
 
@@ -209,6 +219,12 @@ void Simulator::Tick() {
     if (msg_cb_) msg_cb_(msg);
     if (pu_cb_) pu_cb_({msg.symbol, msg.currency, msg.price, msg.bid_ask});
     
+    auto now_pub = std::chrono::system_clock::now();
+    auto in_time_t_pub = std::chrono::system_clock::to_time_t(now_pub);
+    std::stringstream ss_pub;
+    ss_pub << std::put_time(std::gmtime(&in_time_t_pub), "%Y-%m-%dT%H:%M:%SZ");
+    msg.publish_time = ss_pub.str();
+
     bq_client_->StreamMessage(msg);
 } 
 
