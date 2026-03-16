@@ -14,7 +14,8 @@ use socketioxide::{
     extract::SocketRef,
     SocketIo,
 };
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{CorsLayer, AllowOrigin};
+use axum::http::{Method, header};
 use tower_http::services::ServeDir;
 use tracing::{info, Level, warn};
 use tracing_subscriber::FmtSubscriber;
@@ -62,6 +63,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ServeDir::new(".")
     };
 
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(|origin, _| {
+            let origin_str = origin.to_str().unwrap_or("");
+            info!("Incoming CORS request from origin: {}", origin_str);
+            true
+        }))
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::OPTIONS,
+            Method::PUT,
+            Method::DELETE,
+        ])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::ORIGIN,
+            header::HeaderName::from_static("x-requested-with"),
+        ])
+        .expose_headers([
+            header::CONTENT_TYPE,
+        ])
+        .allow_credentials(true);
+
     let app = Router::new()
         .route("/api/config", get(get_config).post(update_config))
         .route("/api/start", post(start_sim))
@@ -69,9 +95,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/status", get(get_status))
         .route("/api/prices", get(get_prices))
         .fallback_service(serve_dir)
+        .with_state(simulator)
         .layer(layer)
-        .layer(CorsLayer::permissive())
-        .with_state(simulator);
+        .layer(cors);
 
     let port_str = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let port = port_str.parse::<u16>().unwrap_or(8080);

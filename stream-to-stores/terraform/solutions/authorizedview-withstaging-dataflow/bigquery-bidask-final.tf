@@ -67,8 +67,8 @@ USING (
 ) AS S
 ON T.symbol = S.symbol AND T.sequenceNumber = S.sequenceNumber
 WHEN NOT MATCHED THEN
-  INSERT (symbol, sequenceNumber, price, currency, venue, timestamp, bidAsk, quantity, ingestion_time)
-  VALUES (symbol, sequenceNumber, price, currency, venue, timestamp, bidAsk, quantity, ingestion_time)
+  INSERT (symbol, sequenceNumber, price, currency, venue, timestamp, bidAsk, quantity, publishTime, ingestion_time)
+  VALUES (symbol, sequenceNumber, price, currency, venue, timestamp, bidAsk, quantity, publishTime, ingestion_time)
 EOF
   }
 

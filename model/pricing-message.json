@@ -40,6 +40,16 @@
     "quantity": {
       "type": "integer",
       "description": "The quantity available at this price"
+    },
+    "publishTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The time when the message was published to BigQuery"
+    },
+    "ingestion_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The time when the message was ingested into BigQuery"
     }
   },
   "required": [

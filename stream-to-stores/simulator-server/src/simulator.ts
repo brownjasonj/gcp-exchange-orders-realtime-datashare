@@ -144,7 +144,8 @@ export class Simulator extends EventEmitter {
       venue: venue,
       timestamp: new Date().toISOString(),
       bidAsk: Math.random() > 0.5 ? 'bid' : 'ask',
-      quantity: Math.floor(Math.random() * 1000) + 1
+      quantity: Math.floor(Math.random() * 1000) + 1,
+      publishTime: new Date().toISOString()
     };
 
     // Emit message immediately to update UI

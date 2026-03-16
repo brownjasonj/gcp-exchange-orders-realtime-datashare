@@ -20,13 +20,22 @@ const server = http.createServer(app);
 
 export const io = new SocketIOServer(server, {
   cors: {
-    origin: ["http://localhost:8080", "http://localhost:4200"],
+    origin: (origin, callback) => {
+      // Mirror the origin back to the client
+      callback(null, origin || true);
+    },
     methods: ["GET", "POST"],
     credentials: true
   }
 });
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Mirror the origin back to the client
+    callback(null, origin || true);
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Load Config & Init Simulator

@@ -31,16 +31,21 @@ fn default_burst_size() -> u64 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PricingMessage {
     pub symbol: String,
-    pub sequence_number: u64,
+    #[serde(rename = "sequenceNumber")]
+    pub sequence_number: i64,
     pub price: f64,
     pub currency: String,
     pub venue: String,
-    pub timestamp: String, // ISO 8601
-    pub bid_ask: String,   // "bid" or "ask"
-    pub quantity: u64,
+    pub timestamp: String,
+    #[serde(rename = "bidAsk")]
+    pub bid_ask: String,
+    pub quantity: i64,
+    #[serde(rename = "publishTime")]
+    pub publish_time: String,
+    #[serde(rename = "ingestion_time", skip_serializing_if = "Option::is_none")]
+    pub ingestion_time: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

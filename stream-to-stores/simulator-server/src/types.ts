@@ -17,4 +17,6 @@ export interface PricingMessage {
   timestamp: string; // ISO 8601
   bidAsk: 'bid' | 'ask';
   quantity: number;
+  publishTime?: string;
+  ingestion_time?: string;
 }

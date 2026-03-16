@@ -15,7 +15,6 @@ output "project_id" {
 output "backend_urls" {
   value = join(",", concat(
     google_cloud_run_v2_service.simulator_server[*].uri,
-    google_cloud_run_v2_service.simulator_server_rust[*].uri,
-    google_cloud_run_v2_service.simulator_server_cpp[*].uri
+    google_cloud_run_v2_service.simulator_server_rust[*].uri
   ))
 }

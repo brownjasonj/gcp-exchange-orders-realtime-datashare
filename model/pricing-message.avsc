@@ -43,6 +43,18 @@
       "name": "quantity",
       "type": "long",
       "doc": "The quantity available at this price"
+    },
+    {
+      "name": "publishTime",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "The time when the message was published to BigQuery"
+    },
+    {
+      "name": "ingestion_time",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "The time when the message was ingested into BigQuery"
     }
   ]
 }

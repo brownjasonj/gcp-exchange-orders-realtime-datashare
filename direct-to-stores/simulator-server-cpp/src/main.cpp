@@ -180,14 +180,16 @@ int main(int argc, char* argv[]) {
                 auto resp = HttpResponse::newHttpResponse();
                 std::string origin = req->getHeader("Origin");
                 if (origin.empty()) origin = req->getHeader("origin");
-                if (origin.empty()) origin = "*";
                 
-                resp->addHeader("Access-Control-Allow-Origin", origin);
+                if (!origin.empty()) {
+                    resp->addHeader("Access-Control-Allow-Origin", origin);
+                    resp->addHeader("Access-Control-Allow-Credentials", "true");
+                    resp->addHeader("Vary", "Origin");
+                }
+                
                 resp->addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
                 resp->addHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept");
-                resp->addHeader("Access-Control-Allow-Credentials", "true");
                 resp->addHeader("Access-Control-Max-Age", "3600");
-                resp->addHeader("Vary", "Origin");
                 resp->setStatusCode(k200OK);
                 resp->setBody("OK"); 
                 cb(resp);
@@ -205,8 +207,6 @@ int main(int argc, char* argv[]) {
                 resp->addHeader("Access-Control-Allow-Origin", origin);
                 resp->addHeader("Access-Control-Allow-Credentials", "true");
                 resp->addHeader("Vary", "Origin");
-            } else {
-                resp->addHeader("Access-Control-Allow-Origin", "*");
             }
         });
 

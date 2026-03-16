@@ -231,20 +231,21 @@ impl Simulator {
                             join_set.spawn(unconstrained(async move {
                                 let mut awaiters = Vec::with_capacity(messages.len());
                                 for msg in messages {
-                                    if let Ok(data) = serde_json::to_vec(&msg) {
+                                    if let Ok(data_str) = serde_json::to_string(&msg) {
+                                        let data = data_str.clone().into_bytes();
                                         let awaiter = publisher.publish(PubsubMessage {
                                             data: data.into(),
                                             ..Default::default()
                                         }).await;
-                                        awaiters.push(awaiter);
+                                        awaiters.push((awaiter, data_str));
                                     }
                                 }
                                 
                                 let mut local_completed = 0;
-                                for awaiter in awaiters {
+                                for (awaiter, payload) in awaiters {
                                     match awaiter.get().await {
                                         Ok(_) => local_completed += 1,
-                                        Err(e) => error!("Burst publish error: {}", e),
+                                        Err(e) => error!("Burst publish error: {}; payload: {}", e, payload),
                                     }
                                 }
                                 local_completed
@@ -385,13 +386,15 @@ impl Simulator {
         
         let msg = PricingMessage {
             symbol: symbol.clone(),
-            sequence_number: state.sequence_number,
+            sequence_number: state.sequence_number as i64,
             price: new_price,
             currency: currency.clone(),
             venue,
-            timestamp: Utc::now().to_rfc3339(),
+            timestamp: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
             bid_ask: if rng.random_bool(0.5) { "bid".to_string() } else { "ask".to_string() },
-            quantity: rng.random_range(1..1001),
+            quantity: rng.random_range(1..1001) as i64,
+            publish_time: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            ingestion_time: None,
         };
         
         state.sequence_number += 1;
@@ -401,14 +404,19 @@ impl Simulator {
     async fn publish_message(&self, msg: &PricingMessage) {
         let publisher_guard = self.publisher.read().await;
         if let Some(publisher) = &*publisher_guard {
-            match serde_json::to_vec(msg) {
-                 Ok(data) => {
+            match serde_json::to_string(msg) {
+                 Ok(data_str) => {
+                     let data = data_str.clone().into_bytes();
                      let publisher = publisher.clone();
                      tokio::spawn(async move {
-                         let _ = publisher.publish(PubsubMessage {
+                         let awaiter = publisher.publish(PubsubMessage {
                              data: data.into(),
                              ..Default::default()
                          }).await;
+                         
+                         if let Err(e) = awaiter.get().await {
+                             error!("Publish notification error: {}; payload: {}", e, data_str);
+                         }
                      });
                  },
                  Err(e) => error!("Failed to serialize message: {}", e),
