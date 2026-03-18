@@ -15,6 +15,12 @@
       "doc": "Monotonically increasing sequence number for the message"
     },
     {
+      "name": "event_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Unique identifier for the event"
+    },
+    {
       "name": "price",
       "type": "double",
       "doc": "The current price value"

@@ -12,6 +12,10 @@
       "type": "integer",
       "description": "Monotonically increasing sequence number for the message"
     },
+    "event_id": {
+      "type": "string",
+      "description": "Unique identifier for the event"
+    },
     "price": {
       "type": "number",
       "description": "The current price value"
@@ -55,6 +59,7 @@
   "required": [
     "symbol",
     "sequenceNumber",
+    "event_id",
     "price",
     "currency",
     "venue",

@@ -11,7 +11,7 @@ resource "google_bigquery_table" "bidask_all_final_dedup" {
                         *,
                         ROW_NUMBER() OVER (
                             PARTITION BY event_id         -- Group duplicates by their unique ID
-                            ORDER BY _PARTITIONTIME ASC   -- Keep the earliest arrival
+                            ORDER BY publishTime ASC   -- Keep the earliest arrival
                         ) AS row_num
                     FROM `${var.project_id}.${var.src_dataset_id}.${google_bigquery_table.bidask_all_final.table_id}`
                     WHERE CURRENT_TIMESTAMP() > TIMESTAMP_ADD(timestamp, INTERVAL ${var.delay_in_seconds} SECOND)

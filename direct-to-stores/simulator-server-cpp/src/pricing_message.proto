@@ -12,4 +12,5 @@ message PricingMessageProto {
     string bidAsk = 7;
     int64 quantity = 8;
     string publishTime = 9;
+    string event_id = 10;
 }

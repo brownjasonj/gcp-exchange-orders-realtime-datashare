@@ -43,7 +43,7 @@ public:
             conn->send("3probe");
         }
         // Handle Socket.IO Connect to default namespace (40)
-        else if (message == "40" || message.substr(0, 2) == "40") {
+        else if (message.length() >= 2 && message.substr(0, 2) == "40") {
             auto ctx = conn->getContext<ConnectionContext>();
             if (ctx && !ctx->connected) {
                 ctx->connected = true;
@@ -51,6 +51,9 @@ public:
                 // Many clients expect the SID in the connect response too.
                 conn->send("40{\"sid\":\"" + ctx->sid + "\"}");
                 std::cout << "[WS] Session " << ctx->sid << " authorized for namespace" << std::endl;
+            } else if (ctx && ctx->connected) {
+                // Already connected, just ack
+                conn->send("40{\"sid\":\"" + ctx->sid + "\"}");
             }
         }
     }
@@ -102,6 +105,9 @@ public:
 };
 
 int main(int argc, char* argv[]) {
+    // Seed randomness for SID generation
+    srand(static_cast<unsigned int>(time(NULL)));
+
     // Disable stdout buffering for immediate feedback in Cloud Run logs
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -149,22 +155,31 @@ int main(int argc, char* argv[]) {
             [](const simulator::PricingMessage& msg) {
                 std::lock_guard<std::mutex> lock(g_connections_mutex);
                 std::string payload = "42[\"message\"," + nlohmann::json(msg).dump() + "]";
-                for (auto it = g_connections.begin(); it != g_connections.end(); ++it) {
-                    (*it)->send(payload);
+                for (auto& conn : g_connections) {
+                    auto ctx = conn->getContext<ConnectionContext>();
+                    if (ctx && ctx->connected) {
+                        conn->send(payload);
+                    }
                 }
             },
             [](const simulator::PriceUpdate& pu) {
                 std::lock_guard<std::mutex> lock(g_connections_mutex);
                 std::string payload = "42[\"priceUpdate\"," + nlohmann::json(pu).dump() + "]";
-                for (auto it = g_connections.begin(); it != g_connections.end(); ++it) {
-                    (*it)->send(payload);
+                for (auto& conn : g_connections) {
+                    auto ctx = conn->getContext<ConnectionContext>();
+                    if (ctx && ctx->connected) {
+                        conn->send(payload);
+                    }
                 }
             },
             [](const simulator::BurstProgress& prog) {
                 std::lock_guard<std::mutex> lock(g_connections_mutex);
                 std::string payload = "42[\"burstProgress\"," + nlohmann::json(prog).dump() + "]";
-                for (auto it = g_connections.begin(); it != g_connections.end(); ++it) {
-                    (*it)->send(payload);
+                for (auto& conn : g_connections) {
+                    auto ctx = conn->getContext<ConnectionContext>();
+                    if (ctx && ctx->connected) {
+                        conn->send(payload);
+                    }
                 }
             }
         );

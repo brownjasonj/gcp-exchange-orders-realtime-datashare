@@ -66,6 +66,7 @@ struct PricingMessage {
     std::string bid_ask;   // "bid" or "ask"
     uint64_t quantity;
     std::string publish_time;
+    std::string event_id;
 
     friend void to_json(nlohmann::json& j, const PricingMessage& m) {
         j = nlohmann::json{
@@ -77,7 +78,8 @@ struct PricingMessage {
             {"timestamp", m.timestamp},
             {"bidAsk", m.bid_ask},
             {"quantity", m.quantity},
-            {"publishTime", m.publish_time}
+            {"publishTime", m.publish_time},
+            {"eventId", m.event_id}
         };
     }
 };

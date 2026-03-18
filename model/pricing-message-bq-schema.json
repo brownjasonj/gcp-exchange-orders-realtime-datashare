@@ -12,6 +12,12 @@
     "description": "Monotonically increasing sequence number for the message"
   },
   {
+    "name": "event_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Unique identifier for the event"
+  },
+  {
     "name": "price",
     "type": "FLOAT",
     "mode": "REQUIRED",

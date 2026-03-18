@@ -199,15 +199,23 @@ PricingMessage Simulator::GenerateMessage() {
     std::uniform_int_distribution<int> bid_ask_dist(0, 1);
     std::uniform_int_distribution<uint64_t> qty_dist(1, 1000);
 
+    uint64_t seq = sequence_number_++;
+    std::string venue = config_.venues[venue_dist(rng_)];
+    std::string timestamp = ss.str();
+    std::string bid_ask = bid_ask_dist(rng_) == 0 ? "bid" : "ask";
+    std::string event_id = pair.first + venue + bid_ask + std::to_string(seq) + timestamp;
+
     PricingMessage msg{
         pair.first,
-        sequence_number_++,
+        seq,
         new_price,
         pair.second,
-        config_.venues[venue_dist(rng_)],
-        ss.str(),
-        bid_ask_dist(rng_) == 0 ? "bid" : "ask",
-        qty_dist(rng_)
+        venue,
+        timestamp,
+        bid_ask,
+        qty_dist(rng_),
+        "", // publishTime
+        event_id
     };
 
     return msg;

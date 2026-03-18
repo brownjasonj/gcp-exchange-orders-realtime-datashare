@@ -43,6 +43,7 @@ bool BigQueryClient::StreamMessages(const std::vector<PricingMessage>& messages)
         proto_msg.set_bidask(msg.bid_ask);
         proto_msg.set_quantity(msg.quantity);
         proto_msg.set_publishtime(msg.publish_time);
+        proto_msg.set_event_id(msg.event_id);
         
         proto_rows->mutable_rows()->add_serialized_rows(proto_msg.SerializeAsString());
     }
