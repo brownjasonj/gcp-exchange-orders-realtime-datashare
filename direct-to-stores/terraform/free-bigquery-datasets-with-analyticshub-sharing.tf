@@ -17,6 +17,10 @@ resource "google_bigquery_analytics_hub_listing" "free_datasets_listing" {
   bigquery_dataset {
     dataset = google_bigquery_dataset.free_datasets.id
   }
+  restricted_export_config {
+    enabled = true
+    restrict_query_result = true
+  }
 
   depends_on = [
     google_bigquery_analytics_hub_data_exchange.datashare
